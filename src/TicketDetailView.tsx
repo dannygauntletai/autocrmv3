@@ -1,6 +1,7 @@
 import { QueuePreview } from "./QueuePreview";
 import { InternalNotesPanel } from "./InternalNotesPanel";
 import { TicketDetailCenterSection } from "./TicketDetailCenterSection";
+import { useState } from "react";
 
 interface Props {
   ticketId: string;
@@ -8,17 +9,25 @@ interface Props {
 }
 
 export const TicketDetailView = ({
-  ticketId,
+  ticketId: initialTicketId,
   onClose
 }: Props) => {
+  // Keep track of the currently viewed ticket
+  const [currentTicketId, setCurrentTicketId] = useState(initialTicketId);
+
+  const handleTicketSelect = (id: string) => {
+    // Just update the current ticket ID
+    setCurrentTicketId(id);
+  };
+
   return (
     <div className="w-full h-full flex gap-4">
       <div className="w-64 flex-shrink-0">
-        <QueuePreview currentTicketId={ticketId} onTicketSelect={id => console.log("Selected ticket:", id)} />
+        <QueuePreview currentTicketId={currentTicketId} onTicketSelect={handleTicketSelect} />
       </div>
-      <TicketDetailCenterSection ticketId={ticketId} onClose={onClose} />
+      <TicketDetailCenterSection ticketId={currentTicketId} onClose={onClose} />
       <div className="w-80 flex-shrink-0">
-        <InternalNotesPanel ticketId={ticketId} />
+        <InternalNotesPanel ticketId={currentTicketId} />
       </div>
     </div>
   );
