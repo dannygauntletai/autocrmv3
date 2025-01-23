@@ -72,11 +72,9 @@ serve(async (req) => {
       .from('employees')
       .select('id')
       .eq('id', userId)
-      .single()
+      .maybeSingle()
 
-    if (employeeSearchError && employeeSearchError.message !== 'No rows found') {
-      throw employeeSearchError
-    }
+    if (employeeSearchError) throw employeeSearchError
 
     let employeeId: string
 
