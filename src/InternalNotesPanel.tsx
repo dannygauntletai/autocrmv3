@@ -1,26 +1,67 @@
 import { NoteItem } from "./NoteItem";
 import { AddNoteForm } from "./AddNoteForm";
-export const InternalNotesPanel = () => {
-  const notes = [{
-    id: 1,
-    author: "Jane Smith",
-    content: "Customer reported similar issue last month. Checking previous resolution.",
-    timestamp: "2023-07-20 10:32:00"
-  }, {
-    id: 2,
-    author: "Mike Johnson",
-    content: "Escalated to engineering team for investigation.",
-    timestamp: "2023-07-20 10:40:00"
-  }];
-  return <div className="bg-white border border-gray-200 rounded-lg">
+import { useInternalNotes } from "./hooks/useInternalNotes";
+
+interface Props {
+  ticketId: string;
+}
+
+export const InternalNotesPanel = ({ ticketId }: Props) => {
+  const { notes, loading, error } = useInternalNotes(ticketId);
+
+  if (loading) {
+    return (
+      <div className="bg-white border border-gray-200 rounded-lg">
+        <div className="p-4 border-b border-gray-200">
+          <h3 className="text-lg font-medium text-gray-900">Internal Notes</h3>
+        </div>
+        <div className="flex justify-center items-center h-32">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-white border border-gray-200 rounded-lg">
+        <div className="p-4 border-b border-gray-200">
+          <h3 className="text-lg font-medium text-gray-900">Internal Notes</h3>
+        </div>
+        <div className="p-4 text-red-600">
+          Error loading notes: {error}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg">
       <div className="p-4 border-b border-gray-200">
         <h3 className="text-lg font-medium text-gray-900">Internal Notes</h3>
       </div>
       <div className="p-4 space-y-4">
-        {notes.map(note => <NoteItem key={note.id} note={note} />)}
+        {notes.length === 0 ? (
+          <div className="text-center text-gray-500 py-4">
+            No internal notes yet.
+          </div>
+        ) : (
+          notes.map(note => (
+            <NoteItem
+              key={note.id}
+              note={{
+                id: note.id,
+                author: note.sender_name || 'Unknown',
+                content: note.message_body,
+                timestamp: note.created_at
+              }}
+            />
+          ))
+        )}
       </div>
       <div className="p-4 border-t border-gray-200 bg-gray-50">
-        <AddNoteForm />
+        <AddNoteForm ticketId={ticketId} />
       </div>
-    </div>;
+    </div>
+  );
 };

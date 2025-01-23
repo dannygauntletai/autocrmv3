@@ -18,7 +18,7 @@ export const TicketDetailView = ({
       </div>
       <TicketDetailCenterSection ticketId={ticketId} onClose={onClose} />
       <div className="w-80 flex-shrink-0">
-        <InternalNotesPanel />
+        <InternalNotesPanel ticketId={ticketId} />
       </div>
     </div>
   );
