@@ -1,19 +1,43 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from './useAuth';
-import type { TicketListItemType } from '../types/common';
+import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
+
+interface AssignedTicket {
+  id: string;
+  subject: string;
+  status: string;
+  priority: string;
+  created_at: string;
+  updated_at: string;
+  customer: string;
+  tags: string[];
+  lastUpdate: string;
+}
+
+interface TicketAssignment {
+  tickets: {
+    id: string;
+    title: string;
+    status: string;
+    priority: string;
+    created_at: string;
+    updated_at: string;
+  };
+}
 
 export const useAssignedTickets = () => {
   const { user } = useAuth();
-  const [tickets, setTickets] = useState<TicketListItemType[]>([]);
+  const [tickets, setTickets] = useState<AssignedTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!user) return;
+
     const fetchAssignedTickets = async () => {
       try {
-        if (!user) return;
-
+        // First get the employee ID
         const { data: employeeData, error: employeeError } = await supabase
           .from('employees')
           .select('id')
@@ -22,46 +46,37 @@ export const useAssignedTickets = () => {
 
         if (employeeError) throw employeeError;
 
-        // First get the assigned ticket IDs
-        const { data: assignments, error: assignmentsError } = await supabase
-          .from('ticket_assignments')
-          .select('ticket_id')
-          .eq('employee_id', employeeData.id)
-          .is('unassigned_at', null);
-
-        if (assignmentsError) throw assignmentsError;
-
-        const ticketIds = assignments.map(a => a.ticket_id);
-
-        if (ticketIds.length === 0) {
-          setTickets([]);
-          return;
-        }
-
-        // Then fetch the actual tickets
-        const { data: assignedTickets, error: ticketsError } = await supabase
+        // Get all active assignments for this employee
+        const { data: assignedTickets, error: assignmentError } = await supabase
           .from('tickets')
           .select(`
             id,
             title,
             status,
             priority,
-            email,
+            created_at,
             updated_at,
-            tags
+            email,
+            tags,
+            ticket_assignments!inner(employee_id)
           `)
-          .in('id', ticketIds);
+          .eq('ticket_assignments.employee_id', employeeData.id)
+          .is('ticket_assignments.unassigned_at', null)
+          .order('updated_at', { ascending: false });
 
-        if (ticketsError) throw ticketsError;
+        if (assignmentError) throw assignmentError;
 
-        const formattedTickets: TicketListItemType[] = (assignedTickets || []).map(ticket => ({
+        // Format the tickets
+        const formattedTickets = (assignedTickets || []).map(ticket => ({
           id: ticket.id,
           subject: ticket.title,
           status: ticket.status,
           priority: ticket.priority,
+          created_at: ticket.created_at,
+          updated_at: ticket.updated_at,
           customer: ticket.email,
-          lastUpdate: ticket.updated_at,
-          tags: ticket.tags || []
+          tags: ticket.tags || [],
+          lastUpdate: new Date(ticket.updated_at).toLocaleString()
         }));
 
         setTickets(formattedTickets);
@@ -75,6 +90,26 @@ export const useAssignedTickets = () => {
     };
 
     fetchAssignedTickets();
+
+    // Subscribe to changes in ticket assignments
+    const subscription = supabase
+      .channel('assigned_tickets_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'ticket_assignments'
+        },
+        (payload: RealtimePostgresChangesPayload<any>) => {
+          fetchAssignedTickets();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [user]);
 
   return { tickets, loading, error };
