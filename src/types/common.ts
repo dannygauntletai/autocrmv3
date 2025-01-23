@@ -1,6 +1,8 @@
 export type TicketStatus = 'open' | 'pending' | 'resolved';
 export type TicketPriority = 'low' | 'medium' | 'high';
-export type TicketCategory = 'technical_support' | 'billing' | 'feature_request' | 'general_inquiry';
+
+// We'll keep TicketCategory for backward compatibility but make it a string
+export type TicketCategory = string;
 
 export interface Ticket {
   id: string;
@@ -9,6 +11,7 @@ export interface Ticket {
   status: TicketStatus;
   priority: TicketPriority;
   category: TicketCategory;
+  team_id: string;
   title: string;
   description: string;
   tags: string[];

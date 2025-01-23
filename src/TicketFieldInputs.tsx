@@ -1,23 +1,28 @@
-import type { ChangeEvent } from 'react';
-import type { TicketPriority, TicketCategory } from './types/common';
+import React from 'react';
 
-interface TicketFieldInputsProps {
+interface TeamCategory {
+  name: string;
+  id: string;
+}
+
+interface Props {
   formData: {
     email: string;
     title: string;
     description: string;
-    priority: TicketPriority;
-    category: TicketCategory;
+    category: string;
+    priority: string;
   };
-  onChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
+  onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
+  teams: TeamCategory[];
 }
 
-export const TicketFieldInputs = ({ formData, onChange }: TicketFieldInputsProps) => {
-  return <div className="space-y-4">
+export const TicketFieldInputs: React.FC<Props> = ({ formData, onChange, teams }) => {
+  return (
+    <>
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
-          Email Address
-          <span className="text-red-500">*</span>
+          Email
         </label>
         <input
           type="email"
@@ -32,7 +37,6 @@ export const TicketFieldInputs = ({ formData, onChange }: TicketFieldInputsProps
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Subject
-          <span className="text-red-500">*</span>
         </label>
         <input
           type="text"
@@ -40,7 +44,21 @@ export const TicketFieldInputs = ({ formData, onChange }: TicketFieldInputsProps
           value={formData.title}
           onChange={onChange}
           className="w-full px-3 py-2 border border-gray-300 rounded-md"
-          placeholder="Enter ticket subject"
+          placeholder="Brief description of the issue"
+          required
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Description
+        </label>
+        <textarea
+          name="description"
+          value={formData.description}
+          onChange={onChange}
+          rows={4}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md"
+          placeholder="Detailed description of the issue"
           required
         />
       </div>
@@ -48,7 +66,6 @@ export const TicketFieldInputs = ({ formData, onChange }: TicketFieldInputsProps
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Category
-            <span className="text-red-500">*</span>
           </label>
           <select
             name="category"
@@ -57,16 +74,17 @@ export const TicketFieldInputs = ({ formData, onChange }: TicketFieldInputsProps
             className="w-full px-3 py-2 border border-gray-300 rounded-md"
             required
           >
-            <option value="technical_support">Technical Support</option>
-            <option value="billing">Billing</option>
-            <option value="feature_request">Feature Request</option>
-            <option value="general_inquiry">General Inquiry</option>
+            <option value="">Select a category</option>
+            {teams.map(team => (
+              <option key={team.id} value={team.name}>
+                {team.name}
+              </option>
+            ))}
           </select>
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Priority
-            <span className="text-red-500">*</span>
           </label>
           <select
             name="priority"
@@ -81,20 +99,6 @@ export const TicketFieldInputs = ({ formData, onChange }: TicketFieldInputsProps
           </select>
         </div>
       </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Description
-          <span className="text-red-500">*</span>
-        </label>
-        <textarea
-          name="description"
-          value={formData.description}
-          onChange={onChange}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md"
-          rows={6}
-          placeholder="Please provide detailed information about the issue"
-          required
-        />
-      </div>
-    </div>;
+    </>
+  );
 };

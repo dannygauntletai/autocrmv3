@@ -1,22 +1,55 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { TicketFieldInputs } from "./TicketFieldInputs";
 import { CustomFieldsRenderer } from "./CustomFieldsRenderer";
 import { FormValidationErrors } from "./FormValidationErrors";
-import type { TicketCategory } from './types/common';
+import { supabase } from './lib/supabase';
+import type { Team } from './types/supabase';
+
+interface TeamCategory {
+  name: string;
+  id: string;
+}
 
 export const CreateTicketForm = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
+  const [teams, setTeams] = useState<TeamCategory[]>([]);
   const [formData, setFormData] = useState({
     email: '',
     title: '',
     description: '',
-    category: 'technical_support' as TicketCategory,
+    category: '',
+    team_id: '', // We'll use this for team_ticket_assignments
     priority: 'low' as const,
     status: 'open' as const,
     tags: [] as string[],
     custom_fields: {} as Record<string, any>
   });
+
+  useEffect(() => {
+    const fetchTeams = async () => {
+      const { data: teamsData, error } = await supabase
+        .from('teams')
+        .select('id, name');
+
+      if (error) {
+        console.error('Error fetching teams:', error);
+        return;
+      }
+
+      setTeams(teamsData || []);
+      // Set the first team as default if available
+      if (teamsData && teamsData.length > 0) {
+        setFormData(prev => ({
+          ...prev,
+          category: teamsData[0].name,
+          team_id: teamsData[0].id
+        }));
+      }
+    };
+
+    fetchTeams();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,6 +62,7 @@ export const CreateTicketForm = () => {
       if (!formData.email) validationErrors.push('Email is required');
       if (!formData.title) validationErrors.push('Subject is required');
       if (!formData.description) validationErrors.push('Description is required');
+      if (!formData.team_id) validationErrors.push('Category is required');
       
       if (validationErrors.length > 0) {
         setErrors(validationErrors);
@@ -45,7 +79,16 @@ export const CreateTicketForm = () => {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
           },
-          body: JSON.stringify(formData),
+          body: JSON.stringify({
+            email: formData.email,
+            title: formData.title,
+            description: formData.description,
+            category: formData.category, // Use the team name directly as category
+            priority: formData.priority,
+            status: formData.status,
+            tags: formData.tags,
+            custom_fields: formData.custom_fields,
+          }),
         }
       );
 
@@ -61,7 +104,8 @@ export const CreateTicketForm = () => {
         email: '',
         title: '',
         description: '',
-        category: 'technical_support' as TicketCategory,
+        category: teams[0]?.name || '',
+        team_id: teams[0]?.id || '',
         priority: 'low',
         status: 'open',
         tags: [],
@@ -80,10 +124,20 @@ export const CreateTicketForm = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    if (name === 'category') {
+      // Find the corresponding team_id for the selected category
+      const selectedTeam = teams.find(team => team.name === value);
+      setFormData(prev => ({
+        ...prev,
+        category: value,
+        team_id: selectedTeam?.id || ''
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
   };
 
   return (
@@ -95,6 +149,7 @@ export const CreateTicketForm = () => {
         <TicketFieldInputs 
           formData={formData}
           onChange={handleInputChange}
+          teams={teams}
         />
         <CustomFieldsRenderer 
           formData={formData}
@@ -112,7 +167,8 @@ export const CreateTicketForm = () => {
               email: '',
               title: '',
               description: '',
-              category: 'technical_support' as TicketCategory,
+              category: teams[0]?.name || '',
+              team_id: teams[0]?.id || '',
               priority: 'low',
               status: 'open',
               tags: [],
