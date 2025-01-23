@@ -9,10 +9,16 @@ interface TeamMember {
   id: string;
   name: string;
   role: string;
-  // Keeping placeholder fields
   skills: string[];
   status: string;
-  activeTickets: number;
+}
+
+interface EmployeeTeamWithEmployee {
+  employee_id: string;
+  role: string;
+  employees: {
+    name: string;
+  };
 }
 
 export const AgentsList = () => {
@@ -42,32 +48,48 @@ export const AgentsList = () => {
       if (!employeeTeam) return;
 
       // Then get all team members with their details using a join
-      const { data, error } = await supabase
+      const { data: members, error } = await supabase
         .from('employee_teams')
         .select(`
           employee_id,
           role,
-          employees (name)
+          employees!inner (
+            name
+          )
         `)
-        .eq('team_id', employeeTeam.team_id);
+        .eq('team_id', employeeTeam.team_id) as { data: EmployeeTeamWithEmployee[] | null, error: any };
 
       if (error) throw error;
-      if (!data) return;
+      if (!members) return;
 
       // Transform the data into our TeamMember format
-      const formattedMembers: TeamMember[] = data
-        .filter(member => member.employees && member.employees.name)
+      const formattedMembers: TeamMember[] = members
+        .filter(member => member.employees?.name)
         .map(member => ({
           id: member.employee_id,
           name: member.employees.name,
           role: member.role === 'supervisor' ? 'Supervisor' : 'Agent',
-          // Placeholder data
-          skills: ["Technical Support", "Customer Service"],
-          status: "Online",
-          activeTickets: 0
+          skills: [], // We'll fetch these from employee_skills table
+          status: "Online"
         }));
 
-      setTeamMembers(formattedMembers);
+      // Now fetch skills for each member
+      const membersWithSkills = await Promise.all(
+        formattedMembers.map(async (member) => {
+          const { data: skillsData } = await supabase
+            .from('employee_skills')
+            .select('skills')
+            .eq('employee_id', member.id)
+            .single();
+
+          return {
+            ...member,
+            skills: skillsData?.skills ? Object.keys(skillsData.skills) : []
+          };
+        })
+      );
+
+      setTeamMembers(membersWithSkills);
     } catch (err) {
       console.error('Error fetching team members:', err);
     } finally {

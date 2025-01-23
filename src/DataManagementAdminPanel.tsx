@@ -76,8 +76,8 @@ export const DataManagementAdminPanel = () => {
                 </div>
               </div>
 
-              {/* Team Management - Available to supervisors and admins */}
-              {(isSupervisor || isAdmin) && (
+              {/* Team Management - Available to supervisors only */}
+              {isSupervisor && (
                 <div>
                   <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
                     Team Management
@@ -155,8 +155,8 @@ export const DataManagementAdminPanel = () => {
               <Route path="/tickets/:id" element={<TicketDetailThread />} />
               <Route path="/templates" element={<TemplateManagementPanel />} />
               
-              {/* Protected routes for supervisors and admins */}
-              {(isSupervisor || isAdmin) && (
+              {/* Protected routes for supervisors only */}
+              {isSupervisor && (
                 <>
                   <Route path="/team" element={<TeamManagementConsole />} />
                   <Route path="/skills" element={<SkillsetsPanel />} />
