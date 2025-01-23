@@ -1,4 +1,6 @@
 import { Clock, Tag } from "lucide-react";
+import type { TicketStatus, TicketPriority } from "./types/common";
+
 interface Ticket {
   id: string;
   subject: string;
@@ -8,12 +10,40 @@ interface Ticket {
   lastUpdate: string;
   tags: string[];
 }
+
 interface Props {
   ticket: Ticket;
   isSelected: boolean;
   onSelect: () => void;
   onClick: () => void;
 }
+
+const getStatusStyle = (status: string) => {
+  switch(status.toLowerCase()) {
+    case 'open':
+      return 'bg-green-100 text-green-800';
+    case 'pending':
+      return 'bg-yellow-100 text-yellow-800';
+    case 'resolved':
+      return 'bg-gray-100 text-gray-800';
+    default:
+      return 'bg-gray-100 text-gray-800';
+  }
+};
+
+const getPriorityStyle = (priority: string) => {
+  switch(priority.toLowerCase()) {
+    case 'high':
+      return 'bg-red-100 text-red-800';
+    case 'medium':
+      return 'bg-blue-100 text-blue-800';
+    case 'low':
+      return 'bg-gray-100 text-gray-800';
+    default:
+      return 'bg-gray-100 text-gray-800';
+  }
+};
+
 export const TicketListItem = ({
   ticket,
   isSelected,
@@ -40,16 +70,10 @@ export const TicketListItem = ({
             <div className="text-sm text-gray-500">
               From: <span className="text-gray-900">{ticket.customer}</span>
             </div>
-            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium
-                ${ticket.status === "Open" ? "bg-green-100 text-green-800" : ""}
-                ${ticket.status === "Pending" ? "bg-yellow-100 text-yellow-800" : ""}
-                ${ticket.status === "On Hold" ? "bg-gray-100 text-gray-800" : ""}`}>
+            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusStyle(ticket.status)}`}>
               {ticket.status}
             </span>
-            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium
-                ${ticket.priority === "High" ? "bg-red-100 text-red-800" : ""}
-                ${ticket.priority === "Medium" ? "bg-blue-100 text-blue-800" : ""}
-                ${ticket.priority === "Low" ? "bg-gray-100 text-gray-800" : ""}`}>
+            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getPriorityStyle(ticket.priority)}`}>
               {ticket.priority}
             </span>
             <div className="flex items-center gap-1">

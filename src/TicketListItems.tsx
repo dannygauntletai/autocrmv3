@@ -1,18 +1,13 @@
 import { TicketListItem } from "./TicketListItem";
+import type { TicketListItemType } from "./types/common";
+
 interface Props {
-  tickets: Array<{
-    id: string;
-    subject: string;
-    status: string;
-    priority: string;
-    customer: string;
-    lastUpdate: string;
-    tags: string[];
-  }>;
+  tickets: TicketListItemType[];
   selectedTickets: string[];
   onTicketSelect: (id: string) => void;
   onTicketClick: (id: string) => void;
 }
+
 export const TicketListItems = ({
   tickets,
   selectedTickets,

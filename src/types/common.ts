@@ -15,6 +15,16 @@ export interface Ticket {
   custom_fields: Record<string, any>;
 }
 
+export interface TicketListItemType {
+  id: string;
+  subject: string;
+  status: string;
+  priority: string;
+  customer: string;
+  lastUpdate: string;
+  tags: string[];
+}
+
 export interface TicketHistory {
   id: string;
   ticket_id: string;
