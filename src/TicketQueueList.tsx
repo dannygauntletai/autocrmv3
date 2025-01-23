@@ -4,29 +4,13 @@ import { TicketListItems } from "./TicketListItems";
 import { BulkOperationsToolbar } from "./BulkOperationsToolbar";
 import { TicketDetailView } from "./TicketDetailView";
 import { useAssignedTickets } from "./hooks/useAssignedTickets";
+import { useTeamTickets } from "./hooks/useTeamTickets";
 
 export const TicketQueueList = () => {
   const [selectedTickets, setSelectedTickets] = useState<string[]>([]);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const { tickets: personalTickets, loading: personalTicketsLoading, error: personalTicketsError } = useAssignedTickets();
-
-  const teamTickets = [{
-    id: "1",
-    subject: "Unable to access dashboard",
-    status: "Open",
-    priority: "High",
-    customer: "John Doe",
-    lastUpdate: "2023-07-20 10:30:00",
-    tags: ["bug", "dashboard"]
-  }, {
-    id: "2",
-    subject: "Feature request: Export to PDF",
-    status: "Pending",
-    priority: "Medium",
-    customer: "Jane Smith",
-    lastUpdate: "2023-07-20 09:15:00",
-    tags: ["feature-request"]
-  }];
+  const { tickets: teamTickets, loading: teamTicketsLoading, error: teamTicketsError } = useTeamTickets();
 
   if (selectedTicketId) {
     return <TicketDetailView ticketId={selectedTicketId} onClose={() => setSelectedTicketId(null)} />;
@@ -36,7 +20,7 @@ export const TicketQueueList = () => {
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-semibold text-gray-900">Ticket Queue</h2>
         <div className="text-sm text-gray-500">
-          Showing <span className="font-medium">24</span> tickets
+          Showing <span className="font-medium">{teamTickets.length + personalTickets.length}</span> tickets
         </div>
       </div>
       <QueueFilterBar />
@@ -45,9 +29,22 @@ export const TicketQueueList = () => {
         <div>
           <h3 className="text-lg font-medium text-gray-900 mb-3">Team Queue</h3>
           <div className="bg-white rounded-lg border border-gray-200">
-            <TicketListItems tickets={teamTickets} selectedTickets={selectedTickets} onTicketSelect={id => {
-            setSelectedTickets(prev => prev.includes(id) ? prev.filter(ticketId => ticketId !== id) : [...prev, id]);
-          }} onTicketClick={setSelectedTicketId} />
+            {teamTicketsError ? (
+              <div className="p-4 text-red-600">Error: {teamTicketsError}</div>
+            ) : teamTicketsLoading ? (
+              <div className="p-4 text-gray-500">Loading team tickets...</div>
+            ) : teamTickets.length === 0 ? (
+              <div className="p-4 text-gray-500">No tickets assigned to your team</div>
+            ) : (
+              <TicketListItems 
+                tickets={teamTickets} 
+                selectedTickets={selectedTickets} 
+                onTicketSelect={id => {
+                  setSelectedTickets(prev => prev.includes(id) ? prev.filter(ticketId => ticketId !== id) : [...prev, id]);
+                }} 
+                onTicketClick={setSelectedTicketId} 
+              />
+            )}
           </div>
         </div>
         <div>

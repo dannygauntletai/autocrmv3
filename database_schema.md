@@ -130,7 +130,7 @@ New/Updated Tables
 
 teams
 id (PK)
-name: e.g., “Billing Support,” “Technical Support,” “Sales,” etc.
+name: e.g., “Billing Support,” “Technical Support,” “Sales,” etc. (this should be used in our ticket category)
 description (optional)
 created_at, updated_at
 
@@ -141,6 +141,25 @@ team_id (FK -> teams.id)
 role_in_team (optional, e.g., “team_lead,” “agent”)
 created_at
 
+We are MAKING THE FOLLOWING CHANGE TO ticket_assigments:
+
+Creating distinct tables for employee and team assignments.
+
+ticket_assignments changes to employee_ticket_assignments
+- id (PK)
+- ticket_id (FK -> tickets.id)
+- employee_id (FK -> employees.id)
+- assigned_at
+- unassigned_at (nullable)
+
+team_ticket_assignments
+- id (PK)
+- ticket_id (FK -> tickets.id)
+- team_id (FK -> teams.id)
+- assigned_at
+- unassigned_at (nullable)
+
+DO NOT IMPLEMENT ROUTING RULES OR EMPLOYEE SKILLS FOR NOW, JUST BE AWARE:
 routing_rules
 id (PK)
 rule_name
@@ -149,9 +168,10 @@ action (JSONB): Defines the outcome (assign to team/agent).
 priority: Integer or numeric to order rule evaluation.
 created_at, updated_at
 
-skillsets
+employee_skills
 id (PK)
 employee_id (FK -> employees.id)
+skills (JSONB): Defines the outcome (assign to ).
 skill_name: e.g., “Billing,” “Technical,” “Spanish Language,” etc.
 skill_level: numeric rating (1-10 or 0-100).
 (Alternatively, you could store skill data in employee_teams or add a JSON column in employees, depending on your design. This table approach is more granular.)

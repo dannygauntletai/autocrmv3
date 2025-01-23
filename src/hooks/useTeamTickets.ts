@@ -4,7 +4,7 @@ import { useAuth } from './useAuth';
 import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { TicketListItemType } from '../types/common';
 
-export const useAssignedTickets = () => {
+export const useTeamTickets = () => {
   const { user } = useAuth();
   const [tickets, setTickets] = useState<TicketListItemType[]>([]);
   const [loading, setLoading] = useState(true);
@@ -13,9 +13,9 @@ export const useAssignedTickets = () => {
   useEffect(() => {
     if (!user) return;
 
-    const fetchAssignedTickets = async () => {
+    const fetchTeamTickets = async () => {
       try {
-        // First get the employee ID
+        // First get the employee's teams
         const { data: employeeData, error: employeeError } = await supabase
           .from('employees')
           .select('id')
@@ -24,7 +24,16 @@ export const useAssignedTickets = () => {
 
         if (employeeError) throw employeeError;
 
-        // Get all active assignments for this employee
+        const { data: teamData, error: teamError } = await supabase
+          .from('employee_teams')
+          .select('team_id')
+          .eq('employee_id', employeeData.id);
+
+        if (teamError) throw teamError;
+
+        const teamIds = teamData.map(t => t.team_id);
+
+        // Get all active team assignments
         const { data: assignedTickets, error: assignmentError } = await supabase
           .from('tickets')
           .select(`
@@ -36,10 +45,10 @@ export const useAssignedTickets = () => {
             updated_at,
             email,
             tags,
-            employee_ticket_assignments!inner(employee_id)
+            team_ticket_assignments!inner(team_id)
           `)
-          .eq('employee_ticket_assignments.employee_id', employeeData.id)
-          .is('employee_ticket_assignments.unassigned_at', null)
+          .in('team_ticket_assignments.team_id', teamIds)
+          .is('team_ticket_assignments.unassigned_at', null)
           .order('updated_at', { ascending: false });
 
         if (assignmentError) throw assignmentError;
@@ -58,27 +67,27 @@ export const useAssignedTickets = () => {
         setTickets(formattedTickets);
         setError(null);
       } catch (err) {
-        console.error('Error fetching assigned tickets:', err);
-        setError(err instanceof Error ? err.message : 'Failed to fetch assigned tickets');
+        console.error('Error fetching team tickets:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch team tickets');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchAssignedTickets();
+    fetchTeamTickets();
 
-    // Subscribe to changes in ticket assignments
+    // Subscribe to changes in team ticket assignments
     const subscription = supabase
-      .channel('assigned_tickets_changes')
+      .channel('team_tickets_changes')
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'employee_ticket_assignments'
+          table: 'team_ticket_assignments'
         },
         (payload: RealtimePostgresChangesPayload<any>) => {
-          fetchAssignedTickets();
+          fetchTeamTickets();
         }
       )
       .subscribe();
