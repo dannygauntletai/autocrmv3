@@ -152,6 +152,7 @@ export const AdminTeamsList = () => {
 
       {isInviteModalOpen && (
         <InviteAgentModal
+          teamId={selectedTeamId || undefined}
           onClose={() => {
             setIsInviteModalOpen(false);
             setSelectedTeamId(null);
