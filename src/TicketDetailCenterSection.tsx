@@ -16,7 +16,7 @@ export const TicketDetailCenterSection = ({
 
   if (loading) {
     return (
-      <div className="flex-1 min-w-0 flex flex-col bg-white border border-gray-200 rounded-lg">
+      <div className="flex-1 min-w-0 flex flex-col bg-white border border-gray-200 rounded-lg h-screen">
         <div className="flex justify-center items-center h-32">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
         </div>
@@ -26,7 +26,7 @@ export const TicketDetailCenterSection = ({
 
   if (error || !ticket) {
     return (
-      <div className="flex-1 min-w-0 flex flex-col bg-white border border-gray-200 rounded-lg">
+      <div className="flex-1 min-w-0 flex flex-col bg-white border border-gray-200 rounded-lg h-screen">
         <div className="p-6 text-red-600">
           Error loading ticket: {error || 'Ticket not found'}
         </div>
@@ -35,7 +35,7 @@ export const TicketDetailCenterSection = ({
   }
 
   return (
-    <div className="flex-1 min-w-0 flex flex-col bg-white border border-gray-200 rounded-lg">
+    <div className="flex-1 min-w-0 flex flex-col bg-white border border-gray-200 rounded-lg h-screen">
       <div className="p-6 border-b border-gray-200">
         <div className="flex items-center gap-4 mb-4">
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
@@ -70,7 +70,7 @@ export const TicketDetailCenterSection = ({
           </span>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 min-h-0 overflow-y-auto p-6">
         <InteractionLog ticketId={ticketId} />
       </div>
       <div className="border-t border-gray-200 bg-gray-50 p-6">
