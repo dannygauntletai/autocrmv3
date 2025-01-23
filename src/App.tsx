@@ -1,8 +1,9 @@
 import { useAuth } from './hooks/useAuth';
 import { DataManagementAdminPanel } from "./DataManagementAdminPanel";
+import { LoginPanel } from './components/LoginPanel';
 
 export function App() {
-  const { user, loading, error, signInAnonymously } = useAuth();
+  const { user, loading, error } = useAuth();
 
   if (loading) {
     return (
@@ -23,16 +24,7 @@ export function App() {
   }
 
   if (!user) {
-    return (
-      <div className="h-screen w-full flex items-center justify-center">
-        <button
-          onClick={signInAnonymously}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-        >
-          Continue as Guest
-        </button>
-      </div>
-    );
+    return <LoginPanel />;
   }
 
   return <DataManagementAdminPanel />;
