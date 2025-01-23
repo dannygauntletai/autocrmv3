@@ -1,4 +1,3 @@
-import React from "react";
 import { DashboardMetricsCards } from "./DashboardMetricsCards";
 import { RecentActivityList } from "./RecentActivityList";
 export const AgentDashboard = () => {

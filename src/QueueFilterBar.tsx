@@ -1,4 +1,3 @@
-import React from "react";
 import { Search, Filter } from "lucide-react";
 export const QueueFilterBar = () => {
   return <div className="flex gap-4 items-center">

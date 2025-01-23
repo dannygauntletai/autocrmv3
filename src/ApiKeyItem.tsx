@@ -1,4 +1,3 @@
-import React from "react";
 import { RefreshCw, Trash2, Copy } from "lucide-react";
 interface ApiKey {
   id: number;

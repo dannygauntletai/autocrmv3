@@ -1,5 +1,4 @@
-import React from "react";
-import { Star, Edit2, Trash2, Circle } from "lucide-react";
+import { Edit2, Trash2, Circle } from "lucide-react";
 interface Agent {
   id: string;
   name: string;

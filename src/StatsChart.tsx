@@ -1,4 +1,3 @@
-import React from "react";
 export const StatsChart = () => {
   // This is a simplified version. In a real app, you might want to use a charting library
   const data = [{

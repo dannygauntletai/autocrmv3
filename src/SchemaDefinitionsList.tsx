@@ -1,4 +1,3 @@
-import React from "react";
 import { SchemaDefinitionItem } from "./SchemaDefinitionItem";
 export const SchemaDefinitionsList = () => {
   // Example schema fields - in real app, this would come from your backend

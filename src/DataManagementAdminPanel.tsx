@@ -1,4 +1,3 @@
-import React from "react";
 import { MemoryRouter as Router, Route, Routes, Link, Navigate, useLocation } from "react-router-dom";
 import { Layout, Database, ClipboardList, FileText, InboxIcon, LayoutDashboard, MessageSquare, Settings, Users, GitBranch, Award, Scale } from "lucide-react";
 import { SchemaDefinitionsManager } from "./SchemaDefinitionsManager";

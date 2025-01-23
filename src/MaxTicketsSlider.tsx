@@ -1,4 +1,3 @@
-import React from "react";
 export const MaxTicketsSlider = () => {
   return <div>
       <div className="flex justify-between items-center mb-4">

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Plus, Users, Edit2, Trash2 } from "lucide-react";
 import { CreateTeamModal } from "./CreateTeamModal";
 export const AdminTeamsList = () => {

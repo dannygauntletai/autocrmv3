@@ -1,4 +1,3 @@
-import React from "react";
 export const CustomFieldsRenderer = () => {
   // Example custom fields - in real app, this would come from your schema definitions
   const customFields = [{

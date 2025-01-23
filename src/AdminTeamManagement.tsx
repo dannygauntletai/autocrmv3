@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Plus } from "lucide-react";
 import { TeamsOverview } from "./TeamsOverview";
 import { TeamsList } from "./TeamsList";

@@ -1,4 +1,3 @@
-import React from "react";
 import { Edit2, Trash2, Power } from "lucide-react";
 interface Rule {
   id: string;

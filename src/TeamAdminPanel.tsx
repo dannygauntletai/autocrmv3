@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { TeamsOverview } from "./TeamsOverview";
 import { AdminTeamsList } from "./AdminTeamsList";
 import { InviteAgentModal } from "./InviteAgentModal";

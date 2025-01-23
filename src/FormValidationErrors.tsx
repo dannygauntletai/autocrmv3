@@ -1,4 +1,3 @@
-import React from "react";
 import { AlertCircle } from "lucide-react";
 export const FormValidationErrors = () => {
   // Example errors - in real app, this would come from form validation

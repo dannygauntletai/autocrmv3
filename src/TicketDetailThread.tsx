@@ -1,4 +1,3 @@
-import React from "react";
 import { MessageList } from "./MessageList";
 import { ReplyEditor } from "./ReplyEditor";
 export const TicketDetailThread = () => {

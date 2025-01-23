@@ -1,4 +1,3 @@
-import React from "react";
 import { TicketListItem } from "./TicketListItem";
 interface Props {
   tickets: Array<{

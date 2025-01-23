@@ -1,5 +1,4 @@
-import React from "react";
-import { X, Search, Star } from "lucide-react";
+import { X, Search } from "lucide-react";
 interface Props {
   onClose: () => void;
 }

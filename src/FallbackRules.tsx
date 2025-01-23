@@ -1,4 +1,3 @@
-import React from "react";
 export const FallbackRules = () => {
   return <div>
       <h4 className="text-sm font-medium text-gray-900 mb-4">Fallback Rules</h4>

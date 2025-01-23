@@ -1,4 +1,3 @@
-import React from "react";
 import { ArrowLeft, Clock } from "lucide-react";
 import { InteractionLog } from "./InteractionLog";
 import { InternalNotesPanel } from "./InternalNotesPanel";

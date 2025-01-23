@@ -1,4 +1,3 @@
-import React from "react";
 import { StatusPriorityTags } from "./StatusPriorityTags";
 import { TicketCustomFields } from "./TicketCustomFields";
 export const TicketInfoSidebar = () => {

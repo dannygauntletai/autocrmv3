@@ -1,4 +1,3 @@
-import React from "react";
 import { Edit2, Trash2, Copy } from "lucide-react";
 interface Template {
   id: number;

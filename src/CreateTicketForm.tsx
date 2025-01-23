@@ -1,4 +1,3 @@
-import React from "react";
 import { TicketFieldInputs } from "./TicketFieldInputs";
 import { CustomFieldsRenderer } from "./CustomFieldsRenderer";
 import { FormValidationErrors } from "./FormValidationErrors";

@@ -1,4 +1,3 @@
-import React from "react";
 import { MaxTicketsSlider } from "./MaxTicketsSlider";
 import { FallbackRules } from "./FallbackRules";
 import { CoverageHoursSettings } from "./CoverageHoursSettings";

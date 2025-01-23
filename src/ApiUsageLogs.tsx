@@ -1,6 +1,6 @@
-import React from "react";
 import { ApiUsageTable } from "./ApiUsageTable";
 import { ApiUsageFilters } from "./ApiUsageFilters";
+
 export const ApiUsageLogs = () => {
   return <div className="bg-white rounded-lg border border-gray-200 p-6">
       <div className="mb-6">

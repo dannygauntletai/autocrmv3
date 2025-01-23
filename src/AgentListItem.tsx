@@ -1,4 +1,3 @@
-import React from "react";
 import { Award, Clock, ThumbsUp, Edit2, Trash2 } from "lucide-react";
 interface Agent {
   id: string;

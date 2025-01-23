@@ -1,4 +1,3 @@
-import React from "react";
 import { Clock, User, FileText } from "lucide-react";
 export const AuditLogList = () => {
   // Example audit logs - in real app, this would come from your backend

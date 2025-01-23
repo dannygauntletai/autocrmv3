@@ -1,4 +1,3 @@
-import React from "react";
 export const TicketCustomFields = () => {
   const customFields = [{
     id: 1,

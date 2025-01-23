@@ -1,4 +1,3 @@
-import React from "react";
 import { Code, Webhook, Activity } from "lucide-react";
 export const IntegrationOverview = () => {
   const features = [{

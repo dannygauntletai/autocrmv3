@@ -1,4 +1,3 @@
-import React from "react";
 import { NoteItem } from "./NoteItem";
 import { AddNoteForm } from "./AddNoteForm";
 export const InternalNotesPanel = () => {

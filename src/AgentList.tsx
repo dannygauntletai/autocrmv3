@@ -1,4 +1,3 @@
-import React from "react";
 import { AgentListItem } from "./AgentListItem";
 export const AgentList = () => {
   const agents = [{

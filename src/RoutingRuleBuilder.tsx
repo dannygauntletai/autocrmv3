@@ -1,4 +1,3 @@
-import React from "react";
 import { RuleCriteriaForm } from "./RuleCriteriaForm";
 import { RuleActionForm } from "./RuleActionForm";
 interface Props {

@@ -1,4 +1,3 @@
-import React from "react";
 import { X, Search } from "lucide-react";
 interface Props {
   teamId: string | null;

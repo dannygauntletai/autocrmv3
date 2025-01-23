@@ -1,4 +1,3 @@
-import React from "react";
 import { Search } from "lucide-react";
 export const ApiUsageFilters = () => {
   return <div className="mb-6 flex gap-4">

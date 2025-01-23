@@ -1,4 +1,3 @@
-import React from "react";
 import { Plus } from "lucide-react";
 export const TicketSidebar = () => {
   return <div className="p-4 space-y-6">

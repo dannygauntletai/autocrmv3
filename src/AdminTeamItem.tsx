@@ -1,4 +1,3 @@
-import React from "react";
 import { Users, Edit2, Trash2, Settings, UserPlus } from "lucide-react";
 interface TeamMetrics {
   responseTime: string;

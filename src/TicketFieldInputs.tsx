@@ -1,4 +1,3 @@
-import React from "react";
 export const TicketFieldInputs = () => {
   return <div className="space-y-4">
       <div>

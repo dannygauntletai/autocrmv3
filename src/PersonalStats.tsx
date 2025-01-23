@@ -1,6 +1,6 @@
-import React from "react";
 import { StatsChart } from "./StatsChart";
 import { StatsSummary } from "./StatsSummary";
+
 export const PersonalStats = () => {
   return <div className="bg-white rounded-lg border border-gray-200">
       <div className="p-4 border-b border-gray-200">

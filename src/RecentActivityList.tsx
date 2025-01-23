@@ -1,4 +1,3 @@
-import React from "react";
 import { MessageSquare, Clock, CheckCircle } from "lucide-react";
 export const RecentActivityList = () => {
   const activities = [{

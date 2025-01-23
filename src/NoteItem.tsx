@@ -1,4 +1,3 @@
-import React from "react";
 import { User, Clock } from "lucide-react";
 interface Note {
   id: number;

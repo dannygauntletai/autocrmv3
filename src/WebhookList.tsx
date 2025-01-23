@@ -1,4 +1,3 @@
-import React from "react";
 import { WebhookItem } from "./WebhookItem";
 export const WebhookList = () => {
   // Example webhooks - in real app, this would come from your backend

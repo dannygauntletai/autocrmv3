@@ -1,4 +1,3 @@
-import React from "react";
 import { TextEditorToolbar } from "./TextEditorToolbar";
 import { QuickResponsesDropdown } from "./QuickResponsesDropdown";
 export const ReplyEditor = () => {

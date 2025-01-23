@@ -1,4 +1,3 @@
-import React from "react";
 import { BulkActionButton } from "./BulkActionButton";
 import { BulkSelectionIndicator } from "./BulkSelectionIndicator";
 interface Props {

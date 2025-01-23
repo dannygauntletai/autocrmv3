@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { QueueFilterBar } from "./QueueFilterBar";
 import { TicketListItems } from "./TicketListItems";
 import { BulkOperationsToolbar } from "./BulkOperationsToolbar";

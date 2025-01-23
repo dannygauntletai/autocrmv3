@@ -1,4 +1,3 @@
-import React from "react";
 export const CoverageHoursSettings = () => {
   return <div>
       <h4 className="text-sm font-medium text-gray-900 mb-4">Coverage Hours</h4>

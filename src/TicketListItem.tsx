@@ -1,4 +1,3 @@
-import React from "react";
 import { Clock, Tag } from "lucide-react";
 interface Ticket {
   id: string;

@@ -1,4 +1,3 @@
-import React from "react";
 import { Clock, CheckCircle, ThumbsUp, Users } from "lucide-react";
 export const TeamPerformanceMetrics = () => {
   const metrics = [{

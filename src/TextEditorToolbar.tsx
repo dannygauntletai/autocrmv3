@@ -1,4 +1,3 @@
-import React from "react";
 import { Bold, Italic, Link, Image, List } from "lucide-react";
 export const TextEditorToolbar = () => {
   return <div className="flex items-center gap-1">

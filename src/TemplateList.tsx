@@ -1,4 +1,3 @@
-import React from "react";
 import { TemplateItem } from "./TemplateItem";
 export const TemplateList = () => {
   const templates = [{

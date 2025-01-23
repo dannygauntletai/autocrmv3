@@ -1,4 +1,3 @@
-import React from "react";
 import { CheckCircle, XCircle } from "lucide-react";
 export const ApiUsageTable = () => {
   // Example API calls - in real app, this would come from your backend

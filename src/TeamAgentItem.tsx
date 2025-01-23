@@ -1,5 +1,4 @@
-import React from "react";
-import { Star, Settings, Award } from "lucide-react";
+import { Settings, Award } from "lucide-react";
 interface AgentMetrics {
   responseTime: string;
   resolution: string;

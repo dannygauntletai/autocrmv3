@@ -1,4 +1,3 @@
-import React from "react";
 import { TeamOverview } from "./TeamOverview";
 import { AgentsList } from "./AgentsList";
 export const TeamManagementConsole = () => {

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Bold, Italic, List, Link, Image, ChevronDown } from "lucide-react";
 export const RichTextEditor = () => {
   const [showTemplates, setShowTemplates] = useState(false);
