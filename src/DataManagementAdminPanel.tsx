@@ -14,6 +14,7 @@ import { SkillsetsPanel } from "./SkillsetsPanel";
 import { LoadBalancingSettings } from "./LoadBalancingSettings";
 import { TeamAdminPanel } from "./TeamAdminPanel";
 import { useAuth } from './hooks/useAuth';
+import { useEmployeeRole } from './hooks/useEmployeeRole';
 
 const NavLink = ({
   to,
@@ -31,6 +32,19 @@ const NavLink = ({
 
 export const DataManagementAdminPanel = () => {
   const { signOut } = useAuth();
+  const { role, loading } = useEmployeeRole();
+
+  if (loading) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  const isAdmin = role === 'admin';
+  const isSupervisor = role === 'supervisor';
+  const isAgent = role === 'agent';
 
   return <Router>
       <div className="flex h-screen w-full bg-gray-50">
@@ -41,6 +55,7 @@ export const DataManagementAdminPanel = () => {
               <h1 className="text-xl font-semibold text-gray-900">AutoCRM</h1>
             </div>
             <nav className="space-y-6">
+              {/* Agent Tools - Available to all roles */}
               <div>
                 <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
                   Agent Tools
@@ -60,56 +75,65 @@ export const DataManagementAdminPanel = () => {
                   </NavLink>
                 </div>
               </div>
-              <div>
-                <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-                  Team Management
+
+              {/* Team Management - Available to supervisors and admins */}
+              {(isSupervisor || isAdmin) && (
+                <div>
+                  <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                    Team Management
+                  </div>
+                  <div className="space-y-1">
+                    <NavLink to="/team">
+                      <Users className="h-5 w-5" />
+                      My Team
+                    </NavLink>
+                    <NavLink to="/routing">
+                      <GitBranch className="h-5 w-5" />
+                      Routing Rules
+                    </NavLink>
+                    <NavLink to="/skills">
+                      <Award className="h-5 w-5" />
+                      Skillsets
+                    </NavLink>
+                    <NavLink to="/load-balancing">
+                      <Scale className="h-5 w-5" />
+                      Load Balancing
+                    </NavLink>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <NavLink to="/team">
-                    <Users className="h-5 w-5" />
-                    My Team
-                  </NavLink>
-                  <NavLink to="/routing">
-                    <GitBranch className="h-5 w-5" />
-                    Routing Rules
-                  </NavLink>
-                  <NavLink to="/skills">
-                    <Award className="h-5 w-5" />
-                    Skillsets
-                  </NavLink>
-                  <NavLink to="/load-balancing">
-                    <Scale className="h-5 w-5" />
-                    Load Balancing
-                  </NavLink>
+              )}
+
+              {/* Administration - Only available to admins */}
+              {isAdmin && (
+                <div>
+                  <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                    Administration
+                  </div>
+                  <div className="space-y-1">
+                    <NavLink to="/admin/teams">
+                      <Users className="h-5 w-5" />
+                      Teams
+                    </NavLink>
+                    <NavLink to="/schema">
+                      <Database className="h-5 w-5" />
+                      Schema Definitions
+                    </NavLink>
+                    <NavLink to="/audit">
+                      <ClipboardList className="h-5 w-5" />
+                      Audit Log
+                    </NavLink>
+                    <NavLink to="/create-ticket">
+                      <FileText className="h-5 w-5" />
+                      Create Ticket
+                    </NavLink>
+                    <NavLink to="/developer">
+                      <Settings className="h-5 w-5" />
+                      Developer Settings
+                    </NavLink>
+                  </div>
                 </div>
-              </div>
-              <div>
-                <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-                  Administration
-                </div>
-                <div className="space-y-1">
-                  <NavLink to="/admin/teams">
-                    <Users className="h-5 w-5" />
-                    Teams
-                  </NavLink>
-                  <NavLink to="/schema">
-                    <Database className="h-5 w-5" />
-                    Schema Definitions
-                  </NavLink>
-                  <NavLink to="/audit">
-                    <ClipboardList className="h-5 w-5" />
-                    Audit Log
-                  </NavLink>
-                  <NavLink to="/create-ticket">
-                    <FileText className="h-5 w-5" />
-                    Create Ticket
-                  </NavLink>
-                  <NavLink to="/developer">
-                    <Settings className="h-5 w-5" />
-                    Developer Settings
-                  </NavLink>
-                </div>
-              </div>
+              )}
+
               <div className="pt-6 border-t border-gray-200">
                 <button
                   onClick={signOut}
@@ -130,15 +154,27 @@ export const DataManagementAdminPanel = () => {
               <Route path="/tickets" element={<TicketQueueList />} />
               <Route path="/tickets/:id" element={<TicketDetailThread />} />
               <Route path="/templates" element={<TemplateManagementPanel />} />
-              <Route path="/team" element={<TeamManagementConsole />} />
-              <Route path="/admin/teams" element={<TeamAdminPanel />} />
-              <Route path="/routing" element={<RoutingRuleList />} />
-              <Route path="/skills" element={<SkillsetsPanel />} />
-              <Route path="/load-balancing" element={<LoadBalancingSettings />} />
-              <Route path="/schema" element={<SchemaDefinitionsManager />} />
-              <Route path="/audit" element={<AuditLogViewer />} />
-              <Route path="/create-ticket" element={<CreateTicketForm />} />
-              <Route path="/developer" element={<DeveloperIntegrationSettings />} />
+              
+              {/* Protected routes for supervisors and admins */}
+              {(isSupervisor || isAdmin) && (
+                <>
+                  <Route path="/team" element={<TeamManagementConsole />} />
+                  <Route path="/routing" element={<RoutingRuleList />} />
+                  <Route path="/skills" element={<SkillsetsPanel />} />
+                  <Route path="/load-balancing" element={<LoadBalancingSettings />} />
+                </>
+              )}
+
+              {/* Protected routes for admins only */}
+              {isAdmin && (
+                <>
+                  <Route path="/admin/teams" element={<TeamAdminPanel />} />
+                  <Route path="/schema" element={<SchemaDefinitionsManager />} />
+                  <Route path="/audit" element={<AuditLogViewer />} />
+                  <Route path="/create-ticket" element={<CreateTicketForm />} />
+                  <Route path="/developer" element={<DeveloperIntegrationSettings />} />
+                </>
+              )}
             </Routes>
           </div>
         </div>
