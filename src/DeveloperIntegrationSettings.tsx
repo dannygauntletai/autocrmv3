@@ -1,6 +1,8 @@
 import { IntegrationOverview } from "./IntegrationOverview";
 import { ApiKeyManagement } from "./ApiKeyManagement";
 import { ApiUsageLogs } from "./ApiUsageLogs";
+import { WebhookConfiguration } from "./WebhookConfiguration";
+
 export const DeveloperIntegrationSettings = () => {
   return <div className="w-full space-y-8">
       <div className="border-b border-gray-200 pb-5">
@@ -8,12 +10,13 @@ export const DeveloperIntegrationSettings = () => {
           Developer Settings
         </h2>
         <p className="mt-2 text-sm text-gray-500">
-          Manage your API keys and monitor API usage.
+          Manage your API keys, webhooks, and monitor API usage.
         </p>
       </div>
       <div className="grid gap-8">
         <IntegrationOverview />
         <ApiKeyManagement />
+        <WebhookConfiguration />
         <ApiUsageLogs />
       </div>
     </div>;

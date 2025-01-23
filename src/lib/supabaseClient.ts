@@ -51,4 +51,32 @@ export type AuditLog = {
   action_details: Record<string, any>;
   performed_by: string;
   created_at: string;
+};
+
+export type ApiKey = {
+  id: string;
+  key_value: string;
+  description: string;
+  permissions: Record<string, boolean>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Webhook = {
+  id: string;
+  url: string;
+  event_types: string[];
+  secret?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ApiLog = {
+  id: string;
+  api_key_id: string;
+  endpoint_accessed: string;
+  request_payload?: Record<string, any>;
+  response_code: number;
+  created_at: string;
 }; 
