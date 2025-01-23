@@ -2,7 +2,7 @@ import { useAuth } from './hooks/useAuth';
 import { DataManagementAdminPanel } from "./DataManagementAdminPanel";
 
 export function App() {
-  const { user, loading, error, signInAnonymously, signOut } = useAuth();
+  const { user, loading, error, signInAnonymously } = useAuth();
 
   if (loading) {
     return (

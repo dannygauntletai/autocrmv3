@@ -1,9 +1,8 @@
 import { useState } from 'react';
-import { supabase } from './lib/supabaseClient';
 import { TicketFieldInputs } from "./TicketFieldInputs";
 import { CustomFieldsRenderer } from "./CustomFieldsRenderer";
 import { FormValidationErrors } from "./FormValidationErrors";
-import type { Ticket, TicketCategory } from './types/common';
+import type { TicketCategory } from './types/common';
 
 export const CreateTicketForm = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -37,28 +36,25 @@ export const CreateTicketForm = () => {
         return;
       }
 
-      // Create ticket
-      const { data, error } = await supabase
-        .from('tickets')
-        .insert([{
-          ...formData,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }])
-        .select()
-        .single();
+      // Call the create-ticket edge function
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-ticket`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify(formData),
+        }
+      );
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create ticket');
+      }
 
-      // Log the action
-      await supabase
-        .from('audit_logs')
-        .insert([{
-          action_type: 'TICKET_CREATE',
-          action_details: { ticket_id: data.id },
-          performed_by: formData.email, // Using email as performer for now
-          created_at: new Date().toISOString(),
-        }]);
+      const data = await response.json();
 
       // Reset form
       setFormData({
@@ -74,9 +70,9 @@ export const CreateTicketForm = () => {
 
       // Show success message or redirect
       alert('Ticket created successfully!');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating ticket:', error);
-      setErrors(['Failed to create ticket. Please try again.']);
+      setErrors([error.message || 'Failed to create ticket. Please try again.']);
     } finally {
       setIsSubmitting(false);
     }

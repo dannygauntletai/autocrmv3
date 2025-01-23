@@ -1,3 +1,12 @@
+-- Create updated_at trigger function first
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
 -- Create tickets table
 CREATE TABLE IF NOT EXISTS tickets (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -40,15 +49,6 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     performed_by TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
-
--- Create updated_at trigger function
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ language 'plpgsql';
 
 -- Add updated_at triggers
 CREATE TRIGGER update_tickets_updated_at

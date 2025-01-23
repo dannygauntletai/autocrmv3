@@ -1,4 +1,4 @@
-import { Edit2, Trash2, Power } from "lucide-react";
+import { Trash2, Power } from "lucide-react";
 import { useState } from "react";
 import { supabase } from "./lib/supabaseClient";
 import type { Webhook } from "./types/common";

@@ -1,3 +1,12 @@
+-- Create updated_at trigger function first
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
 -- Create api_keys table
 CREATE TABLE IF NOT EXISTS api_keys (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -29,13 +38,26 @@ CREATE TABLE IF NOT EXISTS api_logs (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Add updated_at triggers
-CREATE TRIGGER update_api_keys_updated_at
-    BEFORE UPDATE ON api_keys
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
+-- Add updated_at triggers with proper error handling
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger 
+        WHERE tgname = 'update_api_keys_updated_at'
+    ) THEN
+        CREATE TRIGGER update_api_keys_updated_at
+            BEFORE UPDATE ON api_keys
+            FOR EACH ROW
+            EXECUTE FUNCTION update_updated_at_column();
+    END IF;
 
-CREATE TRIGGER update_webhooks_updated_at
-    BEFORE UPDATE ON webhooks
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column(); 
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger 
+        WHERE tgname = 'update_webhooks_updated_at'
+    ) THEN
+        CREATE TRIGGER update_webhooks_updated_at
+            BEFORE UPDATE ON webhooks
+            FOR EACH ROW
+            EXECUTE FUNCTION update_updated_at_column();
+    END IF;
+END $$; 

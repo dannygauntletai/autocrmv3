@@ -5,6 +5,8 @@ Key Tables
 
 tickets
 id (PK): Unique ticket identifier.
+email: Email address of ticket creator
+Category: Category of ticket (e.g., "billing", "technical support", "feature request", "general inquiry")
 created_at: Timestamp when the ticket was created.
 updated_at: Timestamp when the ticket was last updated.
 status: Basic status (e.g., “open,” “pending,” “resolved”).
