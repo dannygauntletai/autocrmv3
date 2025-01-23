@@ -31,9 +31,8 @@ export const InviteAgentModal = ({
               Role
             </label>
             <select className="w-full px-3 py-2 border border-gray-300 rounded-md">
-              <option>Agent</option>
-              <option>Senior Agent</option>
-              <option>Team Lead</option>
+              <option value="agent">Agent</option>
+              <option value="team_lead">Team Lead</option>
             </select>
           </div>
           <div>

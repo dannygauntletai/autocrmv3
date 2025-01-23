@@ -1,11 +1,14 @@
 import { useState, useEffect } from "react";
-import { Plus, Users, Edit2, Trash2 } from "lucide-react";
+import { Plus, Users, Edit2, Trash2, UserPlus } from "lucide-react";
 import { CreateTeamModal } from "./CreateTeamModal";
+import { InviteAgentModal } from "./InviteAgentModal";
 import { supabase } from "./lib/supabase";
 import type { Team, TeamWithStats } from "./types/supabase";
 
 export const AdminTeamsList = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [teams, setTeams] = useState<TeamWithStats[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -120,8 +123,15 @@ export const AdminTeamsList = () => {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button className="p-2 text-gray-600 hover:text-blue-600 rounded-md">
-                    <Edit2 className="h-4 w-4" />
+                  <button 
+                    onClick={() => {
+                      setSelectedTeamId(team.id);
+                      setIsInviteModalOpen(true);
+                    }} 
+                    className="p-2 text-gray-600 hover:text-blue-600 rounded-md"
+                    title="Invite Agent"
+                  >
+                    <UserPlus className="h-4 w-4" />
                   </button>
                   <button className="p-2 text-gray-600 hover:text-red-600 rounded-md">
                     <Trash2 className="h-4 w-4" />
@@ -137,6 +147,15 @@ export const AdminTeamsList = () => {
         <CreateTeamModal
           onClose={() => setIsCreateModalOpen(false)}
           onTeamCreated={fetchTeams}
+        />
+      )}
+
+      {isInviteModalOpen && (
+        <InviteAgentModal
+          onClose={() => {
+            setIsInviteModalOpen(false);
+            setSelectedTeamId(null);
+          }}
         />
       )}
     </div>
