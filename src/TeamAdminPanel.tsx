@@ -2,9 +2,12 @@ import { useState } from "react";
 import { TeamsOverview } from "./TeamsOverview";
 import { AdminTeamsList } from "./AdminTeamsList";
 import { InviteAgentModal } from "./InviteAgentModal";
+
 export const TeamAdminPanel = () => {
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
-  return <div className="w-full space-y-6">
+
+  return (
+    <div className="w-full space-y-6">
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-semibold text-gray-900">
@@ -16,7 +19,8 @@ export const TeamAdminPanel = () => {
         </div>
       </div>
       <TeamsOverview />
-      <AdminTeamsList onInviteAgent={() => setIsInviteModalOpen(true)} />
+      <AdminTeamsList />
       {isInviteModalOpen && <InviteAgentModal onClose={() => setIsInviteModalOpen(false)} />}
-    </div>;
+    </div>
+  );
 };
