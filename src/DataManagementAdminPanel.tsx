@@ -1,5 +1,5 @@
 import { MemoryRouter as Router, Route, Routes, Link, Navigate, useLocation } from "react-router-dom";
-import { Layout, Database, ClipboardList, FileText, InboxIcon, LayoutDashboard, MessageSquare, Settings, Users, GitBranch, Award, Scale } from "lucide-react";
+import { Layout, Database, ClipboardList, FileText, InboxIcon, LayoutDashboard, MessageSquare, Settings, Users, GitBranch, Award, Scale, LogOut } from "lucide-react";
 import { SchemaDefinitionsManager } from "./SchemaDefinitionsManager";
 import { AuditLogViewer } from "./AuditLogViewer";
 import { CreateTicketForm } from "./CreateTicketForm";
@@ -13,6 +13,8 @@ import { RoutingRuleList } from "./RoutingRuleList";
 import { SkillsetsPanel } from "./SkillsetsPanel";
 import { LoadBalancingSettings } from "./LoadBalancingSettings";
 import { TeamAdminPanel } from "./TeamAdminPanel";
+import { useAuth } from './hooks/useAuth';
+
 const NavLink = ({
   to,
   children
@@ -26,7 +28,10 @@ const NavLink = ({
       {children}
     </Link>;
 };
+
 export const DataManagementAdminPanel = () => {
+  const { signOut } = useAuth();
+
   return <Router>
       <div className="flex h-screen w-full bg-gray-50">
         <div className="w-64 bg-white border-r border-gray-200 flex-shrink-0 h-full overflow-y-auto">
@@ -104,6 +109,15 @@ export const DataManagementAdminPanel = () => {
                     Developer Settings
                   </NavLink>
                 </div>
+              </div>
+              <div className="pt-6 border-t border-gray-200">
+                <button
+                  onClick={signOut}
+                  className="flex items-center gap-2 px-3 py-2 w-full text-left rounded-md hover:bg-gray-50 text-gray-700"
+                >
+                  <LogOut className="h-5 w-5" />
+                  Sign Out
+                </button>
               </div>
             </nav>
           </div>
