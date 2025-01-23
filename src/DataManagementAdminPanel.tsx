@@ -87,10 +87,6 @@ export const DataManagementAdminPanel = () => {
                       <Users className="h-5 w-5" />
                       My Team
                     </NavLink>
-                    <NavLink to="/routing">
-                      <GitBranch className="h-5 w-5" />
-                      Routing Rules
-                    </NavLink>
                     <NavLink to="/skills">
                       <Award className="h-5 w-5" />
                       Skillsets
@@ -113,6 +109,10 @@ export const DataManagementAdminPanel = () => {
                     <NavLink to="/admin/teams">
                       <Users className="h-5 w-5" />
                       Teams
+                    </NavLink>
+                    <NavLink to="/routing">
+                      <GitBranch className="h-5 w-5" />
+                      Routing Rules
                     </NavLink>
                     <NavLink to="/schema">
                       <Database className="h-5 w-5" />
@@ -159,7 +159,6 @@ export const DataManagementAdminPanel = () => {
               {(isSupervisor || isAdmin) && (
                 <>
                   <Route path="/team" element={<TeamManagementConsole />} />
-                  <Route path="/routing" element={<RoutingRuleList />} />
                   <Route path="/skills" element={<SkillsetsPanel />} />
                   <Route path="/load-balancing" element={<LoadBalancingSettings />} />
                 </>
@@ -169,6 +168,7 @@ export const DataManagementAdminPanel = () => {
               {isAdmin && (
                 <>
                   <Route path="/admin/teams" element={<TeamAdminPanel />} />
+                  <Route path="/routing" element={<RoutingRuleList />} />
                   <Route path="/schema" element={<SchemaDefinitionsManager />} />
                   <Route path="/audit" element={<AuditLogViewer />} />
                   <Route path="/create-ticket" element={<CreateTicketForm />} />
