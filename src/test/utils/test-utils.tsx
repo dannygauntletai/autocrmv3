@@ -1,22 +1,25 @@
-import { ReactElement } from 'react';
-import { render, RenderOptions } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
+import React from 'react';
+import { render } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 
-const AllTheProviders = ({ children }: { children: React.ReactNode }) => {
-  return (
-    <BrowserRouter>
-      {children}
-    </BrowserRouter>
-  );
+// Mock react-router-dom
+vi.mock('react-router-dom', async () => {
+  const actual = await import('react-router-dom');
+  return {
+    ...actual,
+    useNavigate: () => vi.fn(),
+  };
+});
+
+const customRender = (ui: React.ReactElement, { route = '/' } = {}) => {
+  return render(ui, {
+    wrapper: ({ children }) => (
+      <MemoryRouter initialEntries={[route]}>
+        {children}
+      </MemoryRouter>
+    ),
+  });
 };
 
-const customRender = (
-  ui: ReactElement,
-  options?: Omit<RenderOptions, 'wrapper'>,
-) => render(ui, { wrapper: AllTheProviders, ...options });
-
-// re-export everything
 export * from '@testing-library/react';
-
-// override render method
-export { customRender as render }; 
+export { customRender as render };

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { MessageBubble } from "./MessageBubble";
-import { supabase } from "./lib/supabase";
+import { supabase } from "./lib/supabaseClient";
 
 interface Message {
   id: number;
@@ -73,7 +73,7 @@ export const MessageList = ({ ticketId }: Props) => {
           ...message,
           sender_name: message.sender_type === 'customer' 
             ? sessionStorage.getItem('customerName') || 'Customer'
-            : employeeNames[message.sender_id]
+            : employeeNames[message.sender_id] || 'Employee'
         }));
 
         setMessages(messagesWithNames);
@@ -96,10 +96,8 @@ export const MessageList = ({ ticketId }: Props) => {
         table: 'ticket_messages',
         filter: `ticket_id=eq.${ticketId}`
       }, async (payload) => {
-        // Fetch sender name for the new message
-        const newMessage = payload.new as Message;
-        
         // Skip internal messages for customer view
+        const newMessage = payload.new as Message;
         if (isCustomerView && newMessage.is_internal) {
           return;
         }
@@ -122,7 +120,7 @@ export const MessageList = ({ ticketId }: Props) => {
 
         setMessages(current => [...current, {
           ...newMessage,
-          sender_name: senderData?.name || senderData?.email
+          sender_name: senderData?.name || senderData?.email || 'Employee'
         }]);
       })
       .subscribe();
@@ -163,7 +161,7 @@ export const MessageList = ({ ticketId }: Props) => {
           key={message.id}
           message={{
             id: message.id,
-            sender: message.sender_name || 'Customer',
+            sender: message.sender_name || 'Unknown',
             type: message.sender_type,
             content: message.message_body,
             timestamp: new Date(message.created_at).toLocaleString()

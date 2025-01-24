@@ -1,5 +1,6 @@
 import { QueuePreview } from "./QueuePreview";
 import { InternalNotesPanel } from "./InternalNotesPanel";
+import { EmployeeAssignmentPanel } from "./EmployeeAssignmentPanel";
 import { TicketDetailCenterSection } from "./TicketDetailCenterSection";
 import { useState } from "react";
 
@@ -21,12 +22,13 @@ export const TicketDetailView = ({
   };
 
   return (
-    <div className="w-full h-full flex gap-4">
+    <div className="w-full h-full flex gap-4 py-6">
       <div className="w-64 flex-shrink-0">
         <QueuePreview currentTicketId={currentTicketId} onTicketSelect={handleTicketSelect} />
       </div>
       <TicketDetailCenterSection ticketId={currentTicketId} onClose={onClose} />
-      <div className="w-80 flex-shrink-0">
+      <div className="w-80 flex-shrink-0 space-y-4">
+        <EmployeeAssignmentPanel ticketId={currentTicketId} />
         <InternalNotesPanel ticketId={currentTicketId} />
       </div>
     </div>

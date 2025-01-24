@@ -8,7 +8,8 @@
     "build": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "test": "vitest src/test/**/*.test.{ts,tsx}",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage"
   },
@@ -21,8 +22,8 @@
     "react-router-dom": "latest"
   },
   "devDependencies": {
-    "@testing-library/jest-dom": "^6.6.3",
-    "@testing-library/react": "^16.2.0",
+    "@testing-library/jest-dom": "^6.4.2",
+    "@testing-library/react": "^14.2.1",
     "@testing-library/user-event": "^14.6.1",
     "@types/node": "^20.11.18",
     "@types/react": "^18.3.1",
@@ -30,16 +31,18 @@
     "@typescript-eslint/eslint-plugin": "^5.54.0",
     "@typescript-eslint/parser": "^5.54.0",
     "@vitejs/plugin-react": "^4.2.1",
+    "@vitest/coverage-v8": "^1.2.2",
+    "@vitest/ui": "^1.2.2",
     "autoprefixer": "^10.4.17",
     "eslint": "^8.50.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.1",
-    "jsdom": "^26.0.0",
+    "jsdom": "^24.0.0",
     "postcss": "^8.4.35",
     "supabase": "^2.6.8",
     "tailwindcss": "^3.4.1",
     "typescript": "^5.5.4",
     "vite": "^5.2.0",
-    "vitest": "^3.0.4"
+    "vitest": "^1.2.2"
   }
 }

@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { TicketFieldInputs } from "./TicketFieldInputs";
 import { CustomFieldsRenderer } from "./CustomFieldsRenderer";
 import { FormValidationErrors } from "./FormValidationErrors";
 import { supabase } from './lib/supabase';
@@ -127,12 +126,107 @@ export const CreateTicketForm = () => {
         Create Ticket
       </h2>
       <form onSubmit={handleSubmit} className="space-y-6">
-        <TicketFieldInputs 
-          formData={formData}
-          onChange={handleInputChange}
-          teams={teams}
-          disableEmail={true}
-        />
+        <div>
+          <label 
+            htmlFor="email"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
+            Email
+          </label>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            required
+            disabled={!!sessionStorage.getItem('customerEmail')}
+            value={formData.email}
+            onChange={handleInputChange}
+            placeholder="customer@example.com"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+            aria-readonly={!!sessionStorage.getItem('customerEmail')}
+          />
+        </div>
+        <div>
+          <label
+            htmlFor="title"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
+            Subject
+          </label>
+          <input
+            id="title"
+            name="title"
+            type="text"
+            required
+            value={formData.title}
+            onChange={handleInputChange}
+            placeholder="Brief description of the issue"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+          />
+        </div>
+        <div>
+          <label
+            htmlFor="description"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
+            Description
+          </label>
+          <textarea
+            id="description"
+            name="description"
+            rows={4}
+            required
+            value={formData.description}
+            onChange={handleInputChange}
+            placeholder="Detailed description of the issue"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label
+              htmlFor="category"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Category
+            </label>
+            <select
+              id="category"
+              name="category"
+              required
+              value={formData.category}
+              onChange={handleInputChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+            >
+              <option value="">Select a category</option>
+              {teams.map((team) => (
+                <option key={team.id} value={team.name}>
+                  {team.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label
+              htmlFor="priority"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Priority
+            </label>
+            <select
+              id="priority"
+              name="priority"
+              required
+              value={formData.priority}
+              onChange={handleInputChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+            >
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+        </div>
         <CustomFieldsRenderer 
           formData={formData}
           onChange={(customFields) => setFormData(prev => ({
