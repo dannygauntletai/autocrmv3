@@ -4,6 +4,7 @@ import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
 interface InternalNote {
   id: string;
+  ticket_id: string;
   message_body: string;
   sender_id: string;
   sender_type: 'employee' | 'customer' | 'system';
@@ -25,15 +26,17 @@ export const useInternalNotes = (ticketId: string) => {
   useEffect(() => {
     const fetchNotes = async () => {
       try {
+        console.log('Fetching internal notes for ticket:', ticketId);
         // First get the internal messages
         const { data: messageData, error: messagesError } = await supabase
           .from('ticket_messages')
           .select('*')
           .eq('ticket_id', ticketId)
           .eq('is_internal', true)
-          .order('created_at', { ascending: false });
+          .order('created_at', { ascending: true });
 
         if (messagesError) throw messagesError;
+        console.log('Fetched messages:', messageData);
 
         // For each employee sender, get their name
         const employeeIds = messageData
@@ -46,6 +49,7 @@ export const useInternalNotes = (ticketId: string) => {
           .in('id', employeeIds);
 
         if (employeeError) throw employeeError;
+        console.log('Fetched employee data:', employeeData);
 
         // Create a map of employee IDs to names
         const employeeMap = new Map(
@@ -62,6 +66,7 @@ export const useInternalNotes = (ticketId: string) => {
               : 'Customer'
         })) || [];
 
+        console.log('Setting formatted notes:', formattedNotes);
         setNotes(formattedNotes);
         setError(null);
       } catch (err) {
@@ -72,23 +77,91 @@ export const useInternalNotes = (ticketId: string) => {
       }
     };
 
+    const getEmployeeName = async (employeeId: string): Promise<string> => {
+      try {
+        const { data: employee, error } = await supabase
+          .from('employees')
+          .select('name, email')
+          .eq('id', employeeId)
+          .single();
+
+        if (error) throw error;
+        return employee.name || employee.email;
+      } catch (err) {
+        console.error('Error fetching employee name:', err);
+        return employeeId;
+      }
+    };
+
     fetchNotes();
 
-    // Subscribe to real-time changes for this ticket
-    const subscription = supabase
-      .channel(`ticket_messages_${ticketId}`)
+    // Set up subscription for all ticket messages
+    const channel = supabase.channel('internal_notes_changes');
+    
+    const subscription = channel
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'INSERT',
           schema: 'public',
-          table: 'ticket_messages',
-          filter: `ticket_id=eq.${ticketId}`
+          table: 'ticket_messages'
         },
-        (payload: RealtimePostgresChangesPayload<InternalNote>) => {
-          // Only fetch if the change involves an internal message
-          if (payload.new && isInternalNote(payload.new) && payload.new.is_internal === true) {
-            fetchNotes();
+        async (payload) => {
+          const newMessage = payload.new as InternalNote;
+          console.log('Received new message:', newMessage);
+          
+          // Only process if it's an internal message for this ticket
+          if (newMessage.ticket_id === ticketId && newMessage.is_internal) {
+            console.log('Processing new internal note');
+            
+            // Get employee name if needed
+            if (newMessage.sender_type === 'employee') {
+              const employeeName = await getEmployeeName(newMessage.sender_id);
+              newMessage.sender_name = employeeName;
+            } else {
+              newMessage.sender_name = newMessage.sender_type === 'system' ? 'System' : 'Customer';
+            }
+            
+            // Update notes state
+            setNotes(currentNotes => [...currentNotes, newMessage]);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'ticket_messages'
+        },
+        (payload) => {
+          const updatedMessage = payload.new as InternalNote;
+          
+          // Only process if it's an internal message for this ticket
+          if (updatedMessage.ticket_id === ticketId && updatedMessage.is_internal) {
+            setNotes(currentNotes => 
+              currentNotes.map(note => 
+                note.id === updatedMessage.id ? { ...note, ...updatedMessage } : note
+              )
+            );
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'ticket_messages'
+        },
+        (payload) => {
+          const deletedMessage = payload.old as InternalNote;
+          
+          // Only process if it's an internal message for this ticket
+          if (deletedMessage.ticket_id === ticketId && deletedMessage.is_internal) {
+            setNotes(currentNotes => 
+              currentNotes.filter(note => note.id !== deletedMessage.id)
+            );
           }
         }
       )

@@ -8,6 +8,7 @@ interface Message {
   sender_type: 'customer' | 'employee';
   message_body: string;
   created_at: string;
+  is_internal?: boolean;
   sender_name?: string;
 }
 
@@ -19,22 +20,31 @@ export const MessageList = ({ ticketId }: Props) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const isCustomerView = !!sessionStorage.getItem('customerEmail');
 
   useEffect(() => {
     const fetchMessages = async () => {
       try {
-        // Get all messages for the ticket
-        const { data: messageData, error: messagesError } = await supabase
+        // Get messages for the ticket, filtering out internal messages for customers
+        const query = supabase
           .from('ticket_messages')
           .select(`
             id,
             message_body,
             sender_id,
             sender_type,
-            created_at
+            created_at,
+            is_internal
           `)
           .eq('ticket_id', ticketId)
           .order('created_at', { ascending: true });
+
+        // If viewing as customer, filter out internal messages
+        if (isCustomerView) {
+          query.or('is_internal.is.null,is_internal.eq.false');
+        }
+
+        const { data: messageData, error: messagesError } = await query;
 
         if (messagesError) throw messagesError;
         if (!messageData) return;
@@ -89,6 +99,11 @@ export const MessageList = ({ ticketId }: Props) => {
         // Fetch sender name for the new message
         const newMessage = payload.new as Message;
         
+        // Skip internal messages for customer view
+        if (isCustomerView && newMessage.is_internal) {
+          return;
+        }
+
         // For customer messages, use cached name or default to 'Customer'
         if (newMessage.sender_type === 'customer') {
           setMessages(current => [...current, {
@@ -115,7 +130,7 @@ export const MessageList = ({ ticketId }: Props) => {
     return () => {
       subscription.unsubscribe();
     };
-  }, [ticketId]);
+  }, [ticketId, isCustomerView]);
 
   if (loading) {
     return (

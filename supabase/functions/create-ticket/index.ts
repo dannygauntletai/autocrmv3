@@ -81,6 +81,26 @@ serve(async (req) => {
 
     if (ticketError) throw ticketError
 
+    // Get team ID based on category name
+    const { data: team, error: teamError } = await supabaseClient
+      .from('teams')
+      .select('id')
+      .eq('name', ticketData.category)
+      .single()
+
+    if (teamError) throw teamError
+    if (!team) throw new Error('Team not found for category')
+
+    // Create team ticket assignment
+    const { error: assignmentError } = await supabaseClient
+      .from('team_ticket_assignments')
+      .insert({
+        team_id: team.id,
+        ticket_id: ticket.id
+      })
+
+    if (assignmentError) throw assignmentError
+
     // Create the initial message
     const { error: messageError } = await supabaseClient
       .from('ticket_messages')
