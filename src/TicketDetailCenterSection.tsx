@@ -1,18 +1,26 @@
-import { ArrowLeft, Clock } from "lucide-react";
+import { useState } from 'react';
+import { ArrowLeft, Clock, ChevronDown } from "lucide-react";
 import { InteractionLog } from "./InteractionLog";
 import { RichTextEditor } from "./RichTextEditor";
 import { useTicket } from "./hooks/useTicket";
+import { TicketStatus, TicketPriority } from './types/common';
 
 interface Props {
   ticketId: string;
   onClose: () => void;
 }
 
+const STATUS_OPTIONS: TicketStatus[] = ['open', 'pending', 'resolved'];
+const PRIORITY_OPTIONS: TicketPriority[] = ['low', 'medium', 'high'];
+
 export const TicketDetailCenterSection = ({
   ticketId,
   onClose
 }: Props) => {
-  const { ticket, loading, error } = useTicket(ticketId);
+  const { ticket, loading, error, updateTicketStatus, updateTicketPriority } = useTicket(ticketId);
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const [showPriorityDropdown, setShowPriorityDropdown] = useState(false);
+  const [updating, setUpdating] = useState(false);
 
   if (loading) {
     return (
@@ -34,6 +42,30 @@ export const TicketDetailCenterSection = ({
     );
   }
 
+  const handleStatusChange = async (newStatus: TicketStatus) => {
+    try {
+      setUpdating(true);
+      await updateTicketStatus(newStatus);
+      setShowStatusDropdown(false);
+    } catch (err) {
+      console.error('Failed to update status:', err);
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handlePriorityChange = async (newPriority: TicketPriority) => {
+    try {
+      setUpdating(true);
+      await updateTicketPriority(newPriority);
+      setShowPriorityDropdown(false);
+    } catch (err) {
+      console.error('Failed to update priority:', err);
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   return (
     <div className="flex-1 min-w-0 flex flex-col bg-white border border-gray-200 rounded-lg h-screen">
       <div className="p-6 border-b border-gray-200">
@@ -54,20 +86,66 @@ export const TicketDetailCenterSection = ({
           </div>
         </div>
         <div className="flex gap-2">
-          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-            ticket.status.toLowerCase() === 'open' ? 'bg-yellow-100 text-yellow-800' :
-            ticket.status.toLowerCase() === 'pending' ? 'bg-blue-100 text-blue-800' :
-            'bg-gray-100 text-gray-800'
-          }`}>
-            {ticket.status}
-          </span>
-          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-            ticket.priority.toLowerCase() === 'high' ? 'bg-red-100 text-red-800' :
-            ticket.priority.toLowerCase() === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-            'bg-green-100 text-green-800'
-          }`}>
-            {ticket.priority} Priority
-          </span>
+          <div className="relative">
+            <button
+              onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+              disabled={updating}
+              className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                ticket.status.toLowerCase() === 'open' ? 'bg-yellow-100 text-yellow-800' :
+                ticket.status.toLowerCase() === 'pending' ? 'bg-blue-100 text-blue-800' :
+                'bg-gray-100 text-gray-800'
+              } hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
+            >
+              {ticket.status}
+              <ChevronDown className="h-3 w-3" />
+            </button>
+            {showStatusDropdown && (
+              <div className="absolute mt-1 w-32 bg-white rounded-md shadow-lg z-10">
+                <div className="py-1">
+                  {STATUS_OPTIONS.map((status) => (
+                    <button
+                      key={status}
+                      onClick={() => handleStatusChange(status)}
+                      disabled={updating}
+                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 capitalize"
+                    >
+                      {status}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="relative">
+            <button
+              onClick={() => setShowPriorityDropdown(!showPriorityDropdown)}
+              disabled={updating}
+              className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                ticket.priority.toLowerCase() === 'high' ? 'bg-red-100 text-red-800' :
+                ticket.priority.toLowerCase() === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                'bg-green-100 text-green-800'
+              } hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
+            >
+              {ticket.priority} Priority
+              <ChevronDown className="h-3 w-3" />
+            </button>
+            {showPriorityDropdown && (
+              <div className="absolute mt-1 w-32 bg-white rounded-md shadow-lg z-10">
+                <div className="py-1">
+                  {PRIORITY_OPTIONS.map((priority) => (
+                    <button
+                      key={priority}
+                      onClick={() => handlePriorityChange(priority)}
+                      disabled={updating}
+                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 capitalize"
+                    >
+                      {priority}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto p-6">
