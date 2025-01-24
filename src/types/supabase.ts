@@ -41,5 +41,4 @@ export type Team = Database['public']['Tables']['teams']['Row'];
 export interface TeamWithStats extends Team {
   memberCount: number;
   activeTickets: number;
-  avgResponseTime: string;
 } 

@@ -44,14 +44,10 @@ export const AdminTeamsList = () => {
 
         if (ticketError) throw ticketError;
 
-        // Calculate average response time (mock for now)
-        const avgResponseTime = "1h 30m"; // This would need to be calculated from actual data
-
         return {
           ...team,
           memberCount: memberCount || 0,
-          activeTickets: activeTickets || 0,
-          avgResponseTime
+          activeTickets: activeTickets || 0
         };
       }));
 
@@ -107,7 +103,7 @@ export const AdminTeamsList = () => {
                     {team.name}
                   </h4>
                   <p className="mt-1 text-sm text-gray-500">{team.description}</p>
-                  <div className="mt-4 grid grid-cols-3 gap-4">
+                  <div className="mt-4 grid grid-cols-2 gap-4">
                     <div>
                       <div className="flex items-center text-sm text-gray-600">
                         <Users className="h-4 w-4 mr-2" />
@@ -116,9 +112,6 @@ export const AdminTeamsList = () => {
                     </div>
                     <div className="text-sm text-gray-600">
                       {team.activeTickets} active tickets
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      Avg. response: {team.avgResponseTime}
                     </div>
                   </div>
                 </div>

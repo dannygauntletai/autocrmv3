@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { TeamsOverview } from "./TeamsOverview";
 import { AdminTeamsList } from "./AdminTeamsList";
 import { InviteAgentModal } from "./InviteAgentModal";
 
@@ -18,7 +17,6 @@ export const TeamAdminPanel = () => {
           </p>
         </div>
       </div>
-      <TeamsOverview />
       <AdminTeamsList />
       {isInviteModalOpen && <InviteAgentModal onClose={() => setIsInviteModalOpen(false)} />}
     </div>
