@@ -54,26 +54,28 @@ export const DataManagementAdminPanel = () => {
             <h1 className="text-xl font-semibold text-gray-900">AutoCRM</h1>
           </div>
           <nav className="space-y-6">
-            {/* Agent Tools - Available to all roles */}
-            <div>
-              <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-                Agent Tools
+            {/* Agent Tools - Available to non-admin roles */}
+            {!isAdmin && (
+              <div>
+                <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                  Agent Tools
+                </div>
+                <div className="space-y-1">
+                  <NavLink to="/dashboard">
+                    <LayoutDashboard className="h-5 w-5" />
+                    Dashboard
+                  </NavLink>
+                  <NavLink to="/tickets">
+                    <InboxIcon className="h-5 w-5" />
+                    Ticket Queue
+                  </NavLink>
+                  <NavLink to="/templates">
+                    <MessageSquare className="h-5 w-5" />
+                    Response Templates
+                  </NavLink>
+                </div>
               </div>
-              <div className="space-y-1">
-                <NavLink to="/dashboard">
-                  <LayoutDashboard className="h-5 w-5" />
-                  Dashboard
-                </NavLink>
-                <NavLink to="/tickets">
-                  <InboxIcon className="h-5 w-5" />
-                  Ticket Queue
-                </NavLink>
-                <NavLink to="/templates">
-                  <MessageSquare className="h-5 w-5" />
-                  Response Templates
-                </NavLink>
-              </div>
-            </div>
+            )}
 
             {/* Team Management - Available to supervisors only */}
             {isSupervisor && (
