@@ -22,7 +22,11 @@ export const TicketListItem = ({
   return (
     <div 
       className={`p-4 hover:bg-gray-50 cursor-pointer ${isSelected ? 'bg-blue-50' : ''}`}
-      onClick={onClick}
+      onClick={(e) => {
+        if (!(e.target as HTMLElement).closest('input[type="checkbox"]')) {
+          onClick();
+        }
+      }}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
