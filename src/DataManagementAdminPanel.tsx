@@ -44,7 +44,6 @@ export const DataManagementAdminPanel = () => {
 
   const isAdmin = role === 'admin';
   const isSupervisor = role === 'supervisor';
-  const isAgent = role === 'agent';
 
   return (
     <div className="flex h-screen w-full bg-gray-50">

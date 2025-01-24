@@ -6,7 +6,6 @@ export const CustomerVerify = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
   const [needsName, setNeedsName] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState<string | null>(null);
@@ -15,8 +14,6 @@ export const CustomerVerify = () => {
   useEffect(() => {
     const verifyOtp = async () => {
       try {
-        setLoading(true);
-
         // Get the current session
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         if (sessionError) throw sessionError;
@@ -57,7 +54,6 @@ export const CustomerVerify = () => {
         if (!customer) {
           // New customer needs to enter their name
           setNeedsName(true);
-          setLoading(false);
           return;
         }
 
@@ -73,7 +69,6 @@ export const CustomerVerify = () => {
       } catch (err: any) {
         console.error('Verification error:', err);
         setError(err.message || 'Failed to verify email');
-        setLoading(false);
       }
     };
 

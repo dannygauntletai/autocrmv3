@@ -5,6 +5,7 @@ interface Note {
   author: string;
   content: string;
   timestamp: string;
+  isInternal?: boolean;
 }
 
 interface Props {

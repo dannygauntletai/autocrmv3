@@ -1,10 +1,8 @@
 import { X, Search } from "lucide-react";
 interface Props {
-  teamId: string | null;
   onClose: () => void;
 }
 export const AssignEmployeeModal = ({
-  teamId,
   onClose
 }: Props) => {
   const employees = [{

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from './useAuth';
-import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { TicketListItemType } from '../types/common';
 
 export const useTeamTickets = () => {
@@ -86,7 +85,7 @@ export const useTeamTickets = () => {
           schema: 'public',
           table: 'team_ticket_assignments'
         },
-        (payload: RealtimePostgresChangesPayload<any>) => {
+        () => {
           fetchTeamTickets();
         }
       )

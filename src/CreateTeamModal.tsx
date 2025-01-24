@@ -22,7 +22,7 @@ export const CreateTeamModal = ({
     setError(null);
 
     try {
-      const { data, error: insertError } = await supabase
+      const { error: insertError } = await supabase
         .from("teams")
         .insert([
           {

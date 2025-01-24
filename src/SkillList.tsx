@@ -28,7 +28,7 @@ export const SkillList = () => {
       // Set up real-time subscription
       const channel = supabase.channel('team_skills_changes');
       
-      const subscription = channel
+      channel
         .on('postgres_changes', 
           { 
             event: 'INSERT', 

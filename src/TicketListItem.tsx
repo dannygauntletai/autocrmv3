@@ -1,5 +1,4 @@
 import { Clock, Tag } from "lucide-react";
-import type { TicketStatus, TicketPriority } from "./types/common";
 
 interface Ticket {
   id: string;

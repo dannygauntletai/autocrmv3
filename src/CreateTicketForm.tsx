@@ -4,7 +4,6 @@ import { TicketFieldInputs } from "./TicketFieldInputs";
 import { CustomFieldsRenderer } from "./CustomFieldsRenderer";
 import { FormValidationErrors } from "./FormValidationErrors";
 import { supabase } from './lib/supabase';
-import type { Team } from './types/supabase';
 
 interface TeamCategory {
   name: string;
@@ -21,7 +20,7 @@ export const CreateTicketForm = () => {
     title: '',
     description: '',
     category: '',
-    team_id: '', // We'll use this for team_ticket_assignments
+    team_id: '', 
     priority: 'low' as const,
     status: 'open' as const,
     tags: [] as string[],
@@ -40,7 +39,6 @@ export const CreateTicketForm = () => {
       }
 
       setTeams(teamsData || []);
-      // Set the first team as default if available
       if (teamsData && teamsData.length > 0) {
         setFormData(prev => ({
           ...prev,
@@ -59,7 +57,6 @@ export const CreateTicketForm = () => {
     setErrors([]);
 
     try {
-      // Validate required fields
       const validationErrors: string[] = [];
       if (!formData.title) validationErrors.push('Subject is required');
       if (!formData.description) validationErrors.push('Description is required');
@@ -71,7 +68,6 @@ export const CreateTicketForm = () => {
         return;
       }
 
-      // Call the create-ticket edge function
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-ticket`,
         {
@@ -98,9 +94,6 @@ export const CreateTicketForm = () => {
         throw new Error(errorData.error || 'Failed to create ticket');
       }
 
-      const data = await response.json();
-
-      // Navigate to history page
       navigate('/customer');
 
     } catch (error: any) {
@@ -114,14 +107,13 @@ export const CreateTicketForm = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     if (name === 'category') {
-      // Find the corresponding team_id for the selected category
       const selectedTeam = teams.find(team => team.name === value);
       setFormData(prev => ({
         ...prev,
         category: value,
         team_id: selectedTeam?.id || ''
       }));
-    } else if (name !== 'email') { // Prevent email changes
+    } else if (name !== 'email') { 
       setFormData(prev => ({
         ...prev,
         [name]: value

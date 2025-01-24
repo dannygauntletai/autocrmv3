@@ -12,6 +12,6 @@ export const CustomerDashboard = () => {
           <Route path="/tickets/:id" element={<CustomerTicketDetail />} />
         </Routes>
       </div>
-      <AIChatbot />
+      <AIChatbot onClose={() => {}} />
     </div>;
 };

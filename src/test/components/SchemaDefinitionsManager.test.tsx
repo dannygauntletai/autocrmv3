@@ -32,7 +32,10 @@ describe('SchemaDefinitionsManager', () => {
       select: vi.fn().mockResolvedValue({ data: mockSchemaFields, error: null }),
       insert: vi.fn().mockResolvedValue({ data: null, error: null }),
       update: vi.fn().mockResolvedValue({ data: null, error: null }),
-      delete: vi.fn().mockResolvedValue({ data: null, error: null })
+      delete: vi.fn().mockResolvedValue({ data: null, error: null }),
+      url: new URL('http://mock-url.com'),
+      headers: {},
+      upsert: vi.fn()
     }));
   });
 
@@ -62,7 +65,10 @@ describe('SchemaDefinitionsManager', () => {
       select: vi.fn().mockResolvedValue({ data: null, error: mockError }),
       insert: vi.fn(),
       update: vi.fn(),
-      delete: vi.fn()
+      delete: vi.fn(),
+      url: new URL('http://mock-url.com'),
+      headers: {},
+      upsert: vi.fn()
     }));
 
     render(<SchemaDefinitionsManager />);

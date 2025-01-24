@@ -1,6 +1,5 @@
 import { X } from "lucide-react";
 import { useState, FormEvent } from "react";
-import { supabase } from "./lib/supabase";
 
 interface Props {
   onClose: () => void;

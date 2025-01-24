@@ -35,6 +35,14 @@ export const InternalNotesPanel = ({ ticketId }: Props) => {
     );
   }
 
+  const messages = notes.map(note => ({
+    id: note.id,
+    author: note.sender_name || 'Unknown',
+    content: note.message_body,
+    timestamp: note.created_at,
+    isInternal: note.is_internal
+  }));
+
   return (
     <div className="bg-white border border-gray-200 rounded-lg flex flex-col h-[50vh]">
       <div className="p-4 border-b border-gray-200 flex-shrink-0">
@@ -42,20 +50,15 @@ export const InternalNotesPanel = ({ ticketId }: Props) => {
       </div>
       <div className="flex-1 overflow-y-auto p-4">
         <div className="space-y-4">
-          {notes.length === 0 ? (
+          {messages.length === 0 ? (
             <div className="text-center text-gray-500 py-4">
               No internal notes yet.
             </div>
           ) : (
-            notes.map(note => (
+            messages.map(message => (
               <NoteItem
-                key={note.id}
-                note={{
-                  id: note.id,
-                  author: note.sender_name || 'Unknown',
-                  content: note.message_body,
-                  timestamp: note.created_at
-                }}
+                key={message.id}
+                note={message}
               />
             ))
           )}

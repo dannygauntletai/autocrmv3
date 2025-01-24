@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { PlusCircle, BookOpen, LogOut, Layout, MessageSquare, Clock } from "lucide-react";
+import { PlusCircle, BookOpen, LogOut, Layout, Clock } from "lucide-react";
 
 const NavLink = ({
   to,

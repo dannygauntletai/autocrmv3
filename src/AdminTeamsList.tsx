@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Users, Edit2, Trash2, UserPlus } from "lucide-react";
+import { Plus, Users, Trash2, UserPlus } from "lucide-react";
 import { CreateTeamModal } from "./CreateTeamModal";
 import { InviteAgentModal } from "./InviteAgentModal";
 import { supabase } from "./lib/supabase";

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
 interface InternalNote {
   id: string;
@@ -13,11 +12,6 @@ interface InternalNote {
   is_internal: boolean;
 }
 
-// Type guard to check if an object is an InternalNote
-const isInternalNote = (obj: any): obj is InternalNote => {
-  return obj && typeof obj.is_internal === 'boolean';
-};
-
 export const useInternalNotes = (ticketId: string) => {
   const [notes, setNotes] = useState<InternalNote[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,7 +20,8 @@ export const useInternalNotes = (ticketId: string) => {
   useEffect(() => {
     const fetchNotes = async () => {
       try {
-        // First get the internal messages
+        setLoading(true);
+        
         const { data: messageData, error: messagesError } = await supabase
           .from('ticket_messages')
           .select('*')
@@ -67,7 +62,7 @@ export const useInternalNotes = (ticketId: string) => {
         setError(null);
       } catch (err) {
         console.error('Error fetching internal notes:', err);
-        setError(err instanceof Error ? err.message : 'Failed to fetch internal notes');
+        setError('Failed to load internal notes');
       } finally {
         setLoading(false);
       }
@@ -93,12 +88,11 @@ export const useInternalNotes = (ticketId: string) => {
 
     // Set up subscription for all ticket messages
     const channel = supabase.channel('internal_notes_changes');
-    
-    const subscription = channel
-      .on(
-        'postgres_changes',
+
+    channel
+      .on('postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
           table: 'ticket_messages'
         },
@@ -106,7 +100,7 @@ export const useInternalNotes = (ticketId: string) => {
           const newMessage = payload.new as InternalNote;
           
           // Only process if it's an internal message for this ticket
-          if (newMessage.ticket_id === ticketId && newMessage.is_internal) {
+          if (newMessage.is_internal && newMessage.ticket_id === ticketId) {
             // Get employee name if needed
             if (newMessage.sender_type === 'employee') {
               const employeeName = await getEmployeeName(newMessage.sender_id);
@@ -120,50 +114,12 @@ export const useInternalNotes = (ticketId: string) => {
           }
         }
       )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'ticket_messages'
-        },
-        (payload) => {
-          const updatedMessage = payload.new as InternalNote;
-          
-          // Only process if it's an internal message for this ticket
-          if (updatedMessage.ticket_id === ticketId && updatedMessage.is_internal) {
-            setNotes(currentNotes => 
-              currentNotes.map(note => 
-                note.id === updatedMessage.id ? { ...note, ...updatedMessage } : note
-              )
-            );
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'ticket_messages'
-        },
-        (payload) => {
-          const deletedMessage = payload.old as InternalNote;
-          
-          // Only process if it's an internal message for this ticket
-          if (deletedMessage.ticket_id === ticketId && deletedMessage.is_internal) {
-            setNotes(currentNotes => 
-              currentNotes.filter(note => note.id !== deletedMessage.id)
-            );
-          }
-        }
-      )
       .subscribe();
 
     return () => {
-      subscription.unsubscribe();
+      supabase.removeChannel(channel);
     };
   }, [ticketId]);
 
   return { notes, loading, error };
-}; 
+};

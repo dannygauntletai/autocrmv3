@@ -3,25 +3,20 @@ import { X, Star, StarOff } from "lucide-react";
 import { supabase } from "./lib/supabaseClient";
 
 interface Props {
-  agentId: string | null;
+  agentId: string;
   onClose: () => void;
 }
 
-interface TeamSkill {
+interface Skill {
   id: string;
   skill_name: string;
-}
-
-interface EmployeeSkill {
-  skill_name: string;
-  proficiency: number;
 }
 
 export const AssignSkillsModal = ({
   agentId,
   onClose
 }: Props) => {
-  const [teamSkills, setTeamSkills] = useState<TeamSkill[]>([]);
+  const [teamSkills, setTeamSkills] = useState<Skill[]>([]);
   const [employeeSkills, setEmployeeSkills] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

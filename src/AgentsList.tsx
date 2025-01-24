@@ -129,9 +129,9 @@ export const AgentsList = () => {
           />
         ))}
       </div>
-      {isSkillsModalOpen && (
+      {isSkillsModalOpen && selectedAgent && (
         <AssignSkillsModal 
-          agentId={selectedAgent} 
+          agentId={selectedAgent}
           onClose={() => {
             setIsSkillsModalOpen(false);
             setSelectedAgent(null);

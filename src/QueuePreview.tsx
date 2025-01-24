@@ -69,7 +69,7 @@ export const QueuePreview = ({
                 </span>
                 <span className="flex items-center text-xs text-gray-500">
                   <Clock className="h-3 w-3 mr-1" />
-                  {new Date(ticket.updated_at).toLocaleString()}
+                  {new Date(ticket.lastUpdate).toLocaleString()}
                 </span>
               </div>
             </button>

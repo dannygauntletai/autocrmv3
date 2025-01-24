@@ -40,9 +40,11 @@ export const AddSkillForm = ({
       if (error) throw error;
       if (!data?.team) throw new Error('No team found for supervisor');
       
+      type TeamResponse = { id: string; name: string };
+      const teamData = data.team as unknown as TeamResponse;
       setTeam({
-        id: data.team.id,
-        name: data.team.name
+        id: teamData.id,
+        name: teamData.name
       });
     } catch (err) {
       console.error('Error fetching supervisor team:', err);

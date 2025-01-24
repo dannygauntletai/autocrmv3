@@ -4,7 +4,6 @@ import { TeamItem } from "./TeamItem";
 import { AssignEmployeeModal } from "./AssignEmployeeModal";
 export const TeamsList = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
   const teams = [{
     id: "1",
     name: "Technical Support",
@@ -28,13 +27,11 @@ export const TeamsList = () => {
       </div>
       <div className="divide-y divide-gray-200">
         {teams.map(team => <TeamItem key={team.id} team={team} onAssignEmployee={() => {
-        setSelectedTeam(team.id);
         setIsModalOpen(true);
       }} />)}
       </div>
-      {isModalOpen && <AssignEmployeeModal teamId={selectedTeam} onClose={() => {
+      {isModalOpen && <AssignEmployeeModal onClose={() => {
       setIsModalOpen(false);
-      setSelectedTeam(null);
     }} />}
     </div>;
 };
