@@ -26,7 +26,6 @@ export const useInternalNotes = (ticketId: string) => {
   useEffect(() => {
     const fetchNotes = async () => {
       try {
-        console.log('Fetching internal notes for ticket:', ticketId);
         // First get the internal messages
         const { data: messageData, error: messagesError } = await supabase
           .from('ticket_messages')
@@ -36,7 +35,6 @@ export const useInternalNotes = (ticketId: string) => {
           .order('created_at', { ascending: true });
 
         if (messagesError) throw messagesError;
-        console.log('Fetched messages:', messageData);
 
         // For each employee sender, get their name
         const employeeIds = messageData
@@ -49,7 +47,6 @@ export const useInternalNotes = (ticketId: string) => {
           .in('id', employeeIds);
 
         if (employeeError) throw employeeError;
-        console.log('Fetched employee data:', employeeData);
 
         // Create a map of employee IDs to names
         const employeeMap = new Map(
@@ -66,7 +63,6 @@ export const useInternalNotes = (ticketId: string) => {
               : 'Customer'
         })) || [];
 
-        console.log('Setting formatted notes:', formattedNotes);
         setNotes(formattedNotes);
         setError(null);
       } catch (err) {
@@ -108,12 +104,9 @@ export const useInternalNotes = (ticketId: string) => {
         },
         async (payload) => {
           const newMessage = payload.new as InternalNote;
-          console.log('Received new message:', newMessage);
           
           // Only process if it's an internal message for this ticket
           if (newMessage.ticket_id === ticketId && newMessage.is_internal) {
-            console.log('Processing new internal note');
-            
             // Get employee name if needed
             if (newMessage.sender_type === 'employee') {
               const employeeName = await getEmployeeName(newMessage.sender_id);
