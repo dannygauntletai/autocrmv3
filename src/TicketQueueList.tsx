@@ -55,17 +55,25 @@ export const TicketQueueList = () => {
           Showing <span className="font-medium">{filteredTickets.length}</span> tickets
         </div>
       </div>
-      <QueueFilterBar 
-        onSearchChange={setSearchQuery}
-        onStatusChange={setStatusFilter}
-        onPriorityChange={setPriorityFilter}
-      />
-      {selectedTickets.length > 0 && (
-        <BulkOperationsToolbar 
-          selectedCount={selectedTickets.length} 
-          onClearSelection={() => setSelectedTickets([])} 
+      
+      <div className="space-y-4">
+        <QueueFilterBar 
+          onSearchChange={setSearchQuery}
+          onStatusChange={setStatusFilter}
+          onPriorityChange={setPriorityFilter}
         />
-      )}
+        {selectedTickets.length > 0 && (
+          <BulkOperationsToolbar 
+            selectedTicketIds={selectedTickets}
+            onClearSelection={() => setSelectedTickets([])}
+            onOperationComplete={() => {
+              // Refresh tickets after bulk operation
+              window.location.reload();
+            }}
+          />
+        )}
+      </div>
+
       <div>
         <h3 className="text-lg font-medium text-gray-900 mb-3">{queueTitle}</h3>
         <div className="bg-white rounded-lg border border-gray-200">

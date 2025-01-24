@@ -1,5 +1,5 @@
 export type TicketStatus = 'open' | 'pending' | 'resolved';
-export type TicketPriority = 'low' | 'medium' | 'high';
+export type TicketPriority = 'high' | 'medium' | 'low';
 
 // We'll keep TicketCategory for backward compatibility but make it a string
 export type TicketCategory = string;
@@ -21,11 +21,10 @@ export interface Ticket {
 export interface TicketListItemType {
   id: string;
   subject: string;
-  status: string;
-  priority: string;
   customer: string;
+  status: TicketStatus;
+  priority: TicketPriority;
   lastUpdate: string;
-  tags: string[];
 }
 
 export interface TicketHistory {
@@ -90,3 +89,8 @@ export interface ApiLog {
 
 export type ApiPermission = 'read_tickets' | 'create_tickets' | 'update_tickets' | 'delete_tickets';
 export type WebhookEventType = 'TICKET_CREATED' | 'TICKET_UPDATED' | 'TICKET_DELETED';
+
+export interface Employee {
+  id: string;
+  name: string;
+}
