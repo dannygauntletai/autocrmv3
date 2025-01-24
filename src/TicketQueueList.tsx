@@ -6,10 +6,15 @@ import { TicketDetailView } from "./TicketDetailView";
 import { useAssignedTickets } from "./hooks/useAssignedTickets";
 import { useTeamTickets } from "./hooks/useTeamTickets";
 import { useEmployeeRole } from "./hooks/useEmployeeRole";
+import type { TicketListItemType } from "./types/common";
 
 export const TicketQueueList = () => {
   const [selectedTickets, setSelectedTickets] = useState<string[]>([]);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [priorityFilter, setPriorityFilter] = useState("");
+
   const { role, loading: roleLoading } = useEmployeeRole();
   const { tickets: personalTickets, loading: personalTicketsLoading, error: personalTicketsError } = useAssignedTickets();
   const { tickets: teamTickets, loading: teamTicketsLoading, error: teamTicketsError } = useTeamTickets();
@@ -28,15 +33,33 @@ export const TicketQueueList = () => {
   const error = isSupervisor ? teamTicketsError : personalTicketsError;
   const queueTitle = isSupervisor ? 'Team Queue' : 'My Tickets';
 
+  const filteredTickets = tickets.filter((ticket: TicketListItemType) => {
+    const matchesSearch = searchQuery === "" || 
+      ticket.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      ticket.customer.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesStatus = statusFilter === "" || 
+      ticket.status.toLowerCase() === statusFilter.toLowerCase();
+
+    const matchesPriority = priorityFilter === "" || 
+      ticket.priority.toLowerCase() === priorityFilter.toLowerCase();
+
+    return matchesSearch && matchesStatus && matchesPriority;
+  });
+
   return (
     <div className="w-full space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-semibold text-gray-900">Ticket Queue</h2>
         <div className="text-sm text-gray-500">
-          Showing <span className="font-medium">{tickets.length}</span> tickets
+          Showing <span className="font-medium">{filteredTickets.length}</span> tickets
         </div>
       </div>
-      <QueueFilterBar />
+      <QueueFilterBar 
+        onSearchChange={setSearchQuery}
+        onStatusChange={setStatusFilter}
+        onPriorityChange={setPriorityFilter}
+      />
       {selectedTickets.length > 0 && (
         <BulkOperationsToolbar 
           selectedCount={selectedTickets.length} 
@@ -50,13 +73,13 @@ export const TicketQueueList = () => {
             <div className="p-4 text-red-600">Error: {error}</div>
           ) : loading ? (
             <div className="p-4 text-gray-500">Loading tickets...</div>
-          ) : tickets.length === 0 ? (
+          ) : filteredTickets.length === 0 ? (
             <div className="p-4 text-gray-500">
-              {isSupervisor ? 'No tickets assigned to your team' : 'No tickets assigned to you'}
+              {isSupervisor ? 'No tickets found' : 'No tickets found'}
             </div>
           ) : (
             <TicketListItems 
-              tickets={tickets} 
+              tickets={filteredTickets} 
               selectedTickets={selectedTickets}
               queueType={isSupervisor ? 'team' : 'personal'}
               onTicketSelect={id => {
