@@ -19,8 +19,6 @@ export const CustomerVerify = () => {
         if (!email) {
           throw new Error("No email found in verification link");
         }
-
-        console.log("Checking if customer exists for email:", email);
         
         // Check if customer exists in customers table
         const { data: existingCustomer, error: customerError } = await supabase
@@ -35,13 +33,11 @@ export const CustomerVerify = () => {
         }
 
         if (existingCustomer) {
-          console.log("Customer exists, proceeding to dashboard");
           // Customer exists, store email and proceed
           sessionStorage.setItem('customerEmail', email);
           sessionStorage.setItem('customerName', existingCustomer.name);
           navigate('/customer');
         } else {
-          console.log("Customer does not exist, showing name form");
           // Store email temporarily
           sessionStorage.setItem('customerEmail', email);
           // Customer doesn't exist, show name form
@@ -49,7 +45,6 @@ export const CustomerVerify = () => {
         }
 
       } catch (err: any) {
-        console.error("Verification error:", err);
         setError(err.message);
       } finally {
         setLoading(false);
