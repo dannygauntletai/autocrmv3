@@ -1,8 +1,17 @@
 import { Clock, CheckCircle, AlertCircle, Users } from "lucide-react";
 import { useAgentMetrics } from "./hooks/useAgentMetrics";
+import { useTeamMetrics } from "./hooks/useTeamMetrics";
+import { useEmployeeRole } from "./hooks/useEmployeeRole";
 
 export const DashboardMetricsCards = () => {
-  const { metrics, loading, error } = useAgentMetrics();
+  const { role, loading: roleLoading } = useEmployeeRole();
+  const { metrics: agentMetrics, loading: agentLoading, error: agentError } = useAgentMetrics();
+  const { metrics: teamMetrics, loading: teamLoading, error: teamError } = useTeamMetrics();
+
+  const isSupervisor = role === 'supervisor';
+  const metrics = isSupervisor ? teamMetrics : agentMetrics;
+  const loading = roleLoading || (isSupervisor ? teamLoading : agentLoading);
+  const error = isSupervisor ? teamError : agentError;
 
   if (loading) {
     return (
