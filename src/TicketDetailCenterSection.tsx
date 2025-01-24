@@ -126,7 +126,7 @@ export const TicketDetailCenterSection = ({
                 'bg-green-100 text-green-800'
               } hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
             >
-              {ticket.priority} Priority
+              {ticket.priority}
               <ChevronDown className="h-3 w-3" />
             </button>
             {showPriorityDropdown && (

@@ -1,5 +1,6 @@
 import { QueuePreview } from "./QueuePreview";
 import { InternalNotesPanel } from "./InternalNotesPanel";
+import { CustomFieldsPanel } from "./CustomFieldsPanel";
 import { EmployeeAssignmentPanel } from "./EmployeeAssignmentPanel";
 import { TicketDetailCenterSection } from "./TicketDetailCenterSection";
 import { useState } from "react";
@@ -30,6 +31,7 @@ export const TicketDetailView = ({
       <div className="w-80 flex-shrink-0 space-y-4">
         <EmployeeAssignmentPanel ticketId={currentTicketId} />
         <InternalNotesPanel ticketId={currentTicketId} />
+        <CustomFieldsPanel ticketId={currentTicketId} />
       </div>
     </div>
   );
