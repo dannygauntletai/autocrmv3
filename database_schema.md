@@ -190,8 +190,7 @@ customers
 id (PK)
 name: Full name.
 email: Email address (unique).
-password_hash (or external auth token).
-created_at, updated_at
+created_at
 
 kb_articles
 id (PK)

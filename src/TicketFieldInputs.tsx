@@ -15,9 +15,10 @@ interface Props {
   };
   onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
   teams: TeamCategory[];
+  disableEmail?: boolean;
 }
 
-export const TicketFieldInputs: React.FC<Props> = ({ formData, onChange, teams }) => {
+export const TicketFieldInputs: React.FC<Props> = ({ formData, onChange, teams, disableEmail }) => {
   return (
     <>
       <div>
@@ -29,9 +30,11 @@ export const TicketFieldInputs: React.FC<Props> = ({ formData, onChange, teams }
           name="email"
           value={formData.email}
           onChange={onChange}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md"
+          className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
           placeholder="customer@example.com"
           required
+          disabled={disableEmail}
+          aria-readonly={disableEmail}
         />
       </div>
       <div>

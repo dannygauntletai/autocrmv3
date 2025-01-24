@@ -5,22 +5,13 @@
 // Setup type definitions for built-in Supabase Runtime APIs
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 
-// Follow this setup guide to integrate the Deno runtime with your functions:
-// https://supabase.com/docs/guides/functions/connect-to-supabase
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-console.log("Hello from Functions!")
-
-interface TicketData {
-  email: string
-  title: string
-  description: string
-  category: 'technical_support' | 'billing' | 'feature_request' | 'general_inquiry'
-  priority: 'low' | 'medium' | 'high'
-  status: 'open' | 'pending' | 'resolved'
-  tags: string[]
-  custom_fields: Record<string, any>
+interface MessageData {
+  ticket_id: string
+  message_body: string
+  customer_email: string
 }
 
 serve(async (req) => {
@@ -46,10 +37,10 @@ serve(async (req) => {
       }
     )
 
-    const ticketData: TicketData = await req.json()
+    const messageData: MessageData = await req.json()
 
     // Validate required fields
-    if (!ticketData.email || !ticketData.title || !ticketData.description) {
+    if (!messageData.ticket_id || !messageData.message_body || !messageData.customer_email) {
       return new Response(
         JSON.stringify({ error: 'Missing required fields' }),
         {
@@ -62,52 +53,45 @@ serve(async (req) => {
       )
     }
 
-    // Get customer ID
+    // Get customer ID from email
     const { data: customer, error: customerError } = await supabaseClient
       .from('customers')
       .select('id')
-      .eq('email', ticketData.email)
+      .eq('email', messageData.customer_email)
       .single()
 
     if (customerError) throw customerError
     if (!customer) throw new Error('Customer not found')
 
-    // Insert the ticket
+    // Verify the ticket belongs to this customer
     const { data: ticket, error: ticketError } = await supabaseClient
       .from('tickets')
-      .insert([ticketData])
       .select('id')
+      .eq('id', messageData.ticket_id)
+      .eq('email', messageData.customer_email)
       .single()
 
     if (ticketError) throw ticketError
+    if (!ticket) throw new Error('Ticket not found or access denied')
 
-    // Create the initial message
-    const { error: messageError } = await supabaseClient
+    // Add the message
+    const { data: message, error: messageError } = await supabaseClient
       .from('ticket_messages')
       .insert({
-        ticket_id: ticket.id,
-        message_body: ticketData.description,
+        ticket_id: messageData.ticket_id,
+        message_body: messageData.message_body,
         sender_id: customer.id,
         sender_type: 'customer'
       })
+      .select('id')
+      .single()
 
     if (messageError) throw messageError
 
-    // Create audit log entry
-    await supabaseClient
-      .from('audit_logs')
-      .insert([
-        {
-          action_type: 'TICKET_CREATE',
-          action_details: { ticket_id: ticket.id },
-          performed_by: ticketData.email
-        }
-      ])
-
     return new Response(
       JSON.stringify({
-        ticket_id: ticket.id,
-        message: 'Ticket created successfully'
+        message_id: message.id,
+        message: 'Message added successfully'
       }),
       {
         status: 200,
@@ -136,7 +120,7 @@ serve(async (req) => {
   1. Run `supabase start` (see: https://supabase.com/docs/reference/cli/supabase-start)
   2. Make an HTTP request:
 
-  curl -i --location --request POST 'http://127.0.0.1:54321/functions/v1/create-ticket' \
+  curl -i --location --request POST 'http://127.0.0.1:54321/functions/v1/add-customer-message' \
     --header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0' \
     --header 'Content-Type: application/json' \
     --data '{"name":"Functions"}'

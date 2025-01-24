@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { TicketFieldInputs } from "./TicketFieldInputs";
 import { CustomFieldsRenderer } from "./CustomFieldsRenderer";
 import { FormValidationErrors } from "./FormValidationErrors";
@@ -11,11 +12,12 @@ interface TeamCategory {
 }
 
 export const CreateTicketForm = () => {
+  const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const [teams, setTeams] = useState<TeamCategory[]>([]);
   const [formData, setFormData] = useState({
-    email: '',
+    email: sessionStorage.getItem('customerEmail') || '',
     title: '',
     description: '',
     category: '',
@@ -59,7 +61,6 @@ export const CreateTicketForm = () => {
     try {
       // Validate required fields
       const validationErrors: string[] = [];
-      if (!formData.email) validationErrors.push('Email is required');
       if (!formData.title) validationErrors.push('Subject is required');
       if (!formData.description) validationErrors.push('Description is required');
       if (!formData.team_id) validationErrors.push('Category is required');
@@ -83,7 +84,7 @@ export const CreateTicketForm = () => {
             email: formData.email,
             title: formData.title,
             description: formData.description,
-            category: formData.category, // Use the team name directly as category
+            category: formData.category,
             priority: formData.priority,
             status: formData.status,
             tags: formData.tags,
@@ -99,21 +100,9 @@ export const CreateTicketForm = () => {
 
       const data = await response.json();
 
-      // Reset form
-      setFormData({
-        email: '',
-        title: '',
-        description: '',
-        category: teams[0]?.name || '',
-        team_id: teams[0]?.id || '',
-        priority: 'low',
-        status: 'open',
-        tags: [],
-        custom_fields: {}
-      });
+      // Navigate to history page
+      navigate('/customer');
 
-      // Show success message or redirect
-      alert('Ticket created successfully!');
     } catch (error: any) {
       console.error('Error creating ticket:', error);
       setErrors([error.message || 'Failed to create ticket. Please try again.']);
@@ -132,7 +121,7 @@ export const CreateTicketForm = () => {
         category: value,
         team_id: selectedTeam?.id || ''
       }));
-    } else {
+    } else if (name !== 'email') { // Prevent email changes
       setFormData(prev => ({
         ...prev,
         [name]: value
@@ -150,6 +139,7 @@ export const CreateTicketForm = () => {
           formData={formData}
           onChange={handleInputChange}
           teams={teams}
+          disableEmail={true}
         />
         <CustomFieldsRenderer 
           formData={formData}
@@ -159,24 +149,7 @@ export const CreateTicketForm = () => {
           }))}
         />
         {errors.length > 0 && <FormValidationErrors errors={errors} />}
-        <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
-            onClick={() => setFormData({
-              email: '',
-              title: '',
-              description: '',
-              category: teams[0]?.name || '',
-              team_id: teams[0]?.id || '',
-              priority: 'low',
-              status: 'open',
-              tags: [],
-              custom_fields: {}
-            })}
-          >
-            Cancel
-          </button>
+        <div className="flex justify-end">
           <button
             type="submit"
             disabled={isSubmitting}

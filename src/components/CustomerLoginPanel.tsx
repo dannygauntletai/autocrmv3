@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabaseClient';
 
 export const CustomerLoginPanel = () => {
   const [email, setEmail] = useState('');
@@ -12,15 +13,18 @@ export const CustomerLoginPanel = () => {
     try {
       setLoading(true);
       setMessage('');
+
+      // Send magic link email using Supabase's email OTP
+      const { error: emailError } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/customer/verify`
+        }
+      });
+
+      if (emailError) throw emailError;
       
-      // Store email in sessionStorage for persistence
-      sessionStorage.setItem('customerEmail', email);
-      
-      // Simulate a delay to show loading state
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Redirect to customer panel
-      navigate('/customer');
+      setMessage('Check your email for the login link!');
       
     } catch (error: any) {
       setMessage(error.message || 'An error occurred');
@@ -73,7 +77,7 @@ export const CustomerLoginPanel = () => {
               disabled={loading}
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
             >
-              {loading ? 'Signing in...' : 'Continue to Support'}
+              {loading ? 'Sending verification...' : 'Send Magic Link'}
             </button>
           </div>
         </form>

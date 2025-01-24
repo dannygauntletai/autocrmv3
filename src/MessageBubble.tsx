@@ -2,7 +2,7 @@ import { User, Clock } from "lucide-react";
 interface Message {
   id: number;
   sender: string;
-  type: "customer" | "agent";
+  type: "customer" | "employee";
   content: string;
   timestamp: string;
 }
@@ -12,9 +12,9 @@ interface Props {
 export const MessageBubble = ({
   message
 }: Props) => {
-  const isAgent = message.type === "agent";
-  return <div className={`flex ${isAgent ? "justify-end" : "justify-start"}`}>
-      <div className={`max-w-2xl ${isAgent ? "bg-blue-50" : "bg-gray-50"} rounded-lg p-4`}>
+  const isEmployee = message.type === "employee";
+  return <div className={`flex ${isEmployee ? "justify-end" : "justify-start"}`}>
+      <div className={`max-w-2xl ${isEmployee ? "bg-blue-50" : "bg-gray-50"} rounded-lg p-4`}>
         <div className="flex items-center gap-2 mb-2">
           <User className="h-5 w-5 text-gray-400" />
           <span className="font-medium text-gray-900">{message.sender}</span>
