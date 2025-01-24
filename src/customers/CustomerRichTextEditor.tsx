@@ -17,18 +17,11 @@ export const CustomerRichTextEditor = ({ ticketId }: Props) => {
     setError(null);
     
     try {
-      console.log('Starting message submission...');
       const customerEmail = sessionStorage.getItem('customerEmail');
       if (!customerEmail) throw new Error('Customer email not found');
       
-      console.log('Sending message with data:', {
-        ticket_id: ticketId,
-        message_body: content,
-        customer_email: customerEmail
-      });
-
       // Call the edge function to add the message
-      const { data, error: functionError } = await supabase.functions.invoke('add-customer-message', {
+      const { error: functionError } = await supabase.functions.invoke('add-customer-message', {
         body: {
           ticket_id: ticketId,
           message_body: content,
@@ -36,14 +29,11 @@ export const CustomerRichTextEditor = ({ ticketId }: Props) => {
         }
       });
 
-      console.log('Edge function response:', { data, error: functionError });
-
       if (functionError) {
         console.error('Edge function error:', functionError);
         throw functionError;
       }
 
-      console.log('Message sent successfully:', data);
       setContent('');
     } catch (err: any) {
       console.error('Detailed error:', {
