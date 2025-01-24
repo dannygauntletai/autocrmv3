@@ -1,6 +1,9 @@
 import { useAuth } from './hooks/useAuth';
 import { DataManagementAdminPanel } from "./DataManagementAdminPanel";
 import { LoginPanel } from './components/LoginPanel';
+import { CustomerLoginPanel } from './components/CustomerLoginPanel';
+import { CustomerPanel } from './customers/CustomerPanel';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
 export function App() {
   const { user, loading, error } = useAuth();
@@ -23,9 +26,17 @@ export function App() {
     );
   }
 
-  if (!user) {
-    return <LoginPanel />;
-  }
-
-  return <DataManagementAdminPanel />;
+  return (
+    <Router>
+      <Routes>
+        {/* Customer routes - separate flow from admin/agent auth */}
+        <Route path="/customer/login" element={<CustomerLoginPanel />} />
+        <Route path="/customer/*" element={<CustomerPanel />} />
+        
+        {/* Main route for admin/agent login and dashboard */}
+        <Route path="/" element={!user ? <LoginPanel /> : <DataManagementAdminPanel />} />
+        <Route path="/*" element={!user ? <LoginPanel /> : <DataManagementAdminPanel />} />
+      </Routes>
+    </Router>
+  );
 }
