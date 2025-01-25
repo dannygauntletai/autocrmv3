@@ -24,7 +24,7 @@ export const TicketDetailCenterSection = ({
 
   if (loading) {
     return (
-      <div className="flex-1 min-w-0 flex flex-col bg-white border border-gray-200 rounded-lg h-screen">
+      <div className="flex-1 flex flex-col bg-white border border-gray-200 rounded-lg max-h-screen overflow-hidden">
         <div className="flex justify-center items-center h-32">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
         </div>
@@ -34,7 +34,7 @@ export const TicketDetailCenterSection = ({
 
   if (error || !ticket) {
     return (
-      <div className="flex-1 min-w-0 flex flex-col bg-white border border-gray-200 rounded-lg h-screen">
+      <div className="flex-1 flex flex-col bg-white border border-gray-200 rounded-lg max-h-screen overflow-hidden">
         <div className="p-6 text-red-600">
           Error loading ticket: {error || 'Ticket not found'}
         </div>
@@ -67,25 +67,26 @@ export const TicketDetailCenterSection = ({
   };
 
   return (
-    <div className="flex-1 min-w-0 flex flex-col bg-white border border-gray-200 rounded-lg h-screen">
-      <div className="p-6 border-b border-gray-200">
+    <div className="flex-1 flex flex-col bg-white border border-gray-200 rounded-lg max-h-screen overflow-hidden">
+      {/* Header Section */}
+      <div className="flex-shrink-0 p-6 border-b border-gray-200">
         <div className="flex items-center gap-4 mb-4">
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
             <ArrowLeft className="h-5 w-5" />
           </button>
-          <div>
-            <h1 className="text-2xl font-semibold text-gray-900">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-2xl font-semibold text-gray-900 truncate">
               {ticket.title}
             </h1>
             <div className="mt-1 flex items-center gap-2 text-sm text-gray-500">
-              <span>Ticket #{ticketId}</span>
-              <span>•</span>
-              <Clock className="h-4 w-4" />
-              <span>Created {new Date(ticket.created_at).toLocaleDateString()}</span>
+              <span className="truncate">Ticket #{ticketId}</span>
+              <span className="flex-shrink-0">•</span>
+              <Clock className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Created {new Date(ticket.created_at).toLocaleDateString()}</span>
             </div>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <div className="relative">
             <button
               onClick={() => setShowStatusDropdown(!showStatusDropdown)}
@@ -148,10 +149,14 @@ export const TicketDetailCenterSection = ({
           </div>
         </div>
       </div>
+
+      {/* Interaction Log Section - Scrollable */}
       <div className="flex-1 min-h-0 overflow-y-auto p-6">
         <InteractionLog ticketId={ticketId} />
       </div>
-      <div className="border-t border-gray-200 bg-gray-50 p-6">
+
+      {/* Rich Text Editor Section - Fixed at bottom */}
+      <div className="flex-shrink-0 border-t border-gray-200 bg-gray-50 p-6">
         <RichTextEditor ticketId={ticketId} />
       </div>
     </div>
