@@ -1,5 +1,5 @@
 import { Route, Routes, Link, Navigate, useLocation } from "react-router-dom";
-import { Layout, Database, ClipboardList, FileText, InboxIcon, LayoutDashboard, MessageSquare, Settings, Users, GitBranch, Award, Scale, LogOut } from "lucide-react";
+import { Layout, Database, ClipboardList, FileText, InboxIcon, LayoutDashboard, MessageSquare, Users, GitBranch, Award, Scale, LogOut } from "lucide-react";
 import { SchemaDefinitionsManager } from "./SchemaDefinitionsManager";
 import { AuditLogViewer } from "./AuditLogViewer";
 import { CreateTicketForm } from "./CreateTicketForm";
@@ -7,7 +7,6 @@ import { TicketQueueList } from "./TicketQueueList";
 import { TicketDetailThread } from "./TicketDetailThread";
 import { AgentDashboard } from "./AgentDashboard";
 import { TemplateManagementPanel } from "./TemplateManagementPanel";
-import { DeveloperIntegrationSettings } from "./DeveloperIntegrationSettings";
 import { TeamManagementConsole } from "./TeamManagementConsole";
 import { RoutingRuleList } from "./RoutingRuleList";
 import { SkillsetsPanel } from "./SkillsetsPanel";
@@ -127,10 +126,6 @@ export const DataManagementAdminPanel = () => {
                     <FileText className="h-5 w-5" />
                     Create Ticket
                   </NavLink>
-                  <NavLink to="/developer">
-                    <Settings className="h-5 w-5" />
-                    Developer Settings
-                  </NavLink>
                 </div>
               </div>
             )}
@@ -173,7 +168,6 @@ export const DataManagementAdminPanel = () => {
                 <Route path="/schema" element={<SchemaDefinitionsManager />} />
                 <Route path="/audit" element={<AuditLogViewer />} />
                 <Route path="/create-ticket" element={<CreateTicketForm />} />
-                <Route path="/developer" element={<DeveloperIntegrationSettings />} />
               </>
             )}
           </Routes>
