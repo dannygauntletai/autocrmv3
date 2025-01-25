@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bold, Italic, List, Link, Image, ChevronDown } from "lucide-react";
+import { Sparkles, ChevronDown } from "lucide-react";
 import { supabase } from './lib/supabaseClient';
 import { useAuth } from './hooks/useAuth';
 
@@ -11,6 +11,7 @@ export const RichTextEditor = ({ ticketId }: Props) => {
   const [showTemplates, setShowTemplates] = useState(false);
   const [content, setContent] = useState('');
   const [sending, setSending] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const { user } = useAuth();
 
   const templates = [{
@@ -22,6 +23,34 @@ export const RichTextEditor = ({ ticketId }: Props) => {
     name: "Technical Issue",
     content: "I understand you're experiencing technical difficulties."
   }];
+
+  const handleGenerateResponse = async () => {
+    setGenerating(true);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-response`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to generate response');
+      }
+
+      const data = await response.json();
+      setContent(data.response);
+    } catch (error) {
+      console.error('Error generating response:', error);
+      alert('Failed to generate response. Please try again.');
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   const handleSendReply = async () => {
     if (!content.trim() || !user) return;
@@ -69,20 +98,12 @@ export const RichTextEditor = ({ ticketId }: Props) => {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <button className="p-2 text-gray-600 hover:text-gray-900 rounded">
-            <Bold className="h-5 w-5" />
-          </button>
-          <button className="p-2 text-gray-600 hover:text-gray-900 rounded">
-            <Italic className="h-5 w-5" />
-          </button>
-          <button className="p-2 text-gray-600 hover:text-gray-900 rounded">
-            <List className="h-5 w-5" />
-          </button>
-          <button className="p-2 text-gray-600 hover:text-gray-900 rounded">
-            <Link className="h-5 w-5" />
-          </button>
-          <button className="p-2 text-gray-600 hover:text-gray-900 rounded">
-            <Image className="h-5 w-5" />
+          <button 
+            className="p-2 text-gray-600 hover:text-gray-900 rounded disabled:opacity-50"
+            onClick={handleGenerateResponse}
+            disabled={generating}
+          >
+            <Sparkles className={`h-5 w-5 ${generating ? 'animate-spin' : ''}`} />
           </button>
         </div>
         <div className="relative">
