@@ -7,22 +7,22 @@ interface Props {
   ticketId: string;
 }
 
+const QUICK_TEMPLATES = [{
+  id: 'greeting',
+  name: "General Greeting",
+  content: "Hi, thank you for reaching out!"
+}, {
+  id: 'technical',
+  name: "Technical Issue",
+  content: "I understand you're experiencing technical difficulties."
+}] as const;
+
 export const RichTextEditor = ({ ticketId }: Props) => {
   const [showTemplates, setShowTemplates] = useState(false);
   const [content, setContent] = useState('');
   const [sending, setSending] = useState(false);
   const [generating, setGenerating] = useState(false);
   const { user } = useAuth();
-
-  const templates = [{
-    id: 1,
-    name: "General Greeting",
-    content: "Hi, thank you for reaching out!"
-  }, {
-    id: 2,
-    name: "Technical Issue",
-    content: "I understand you're experiencing technical difficulties."
-  }];
 
   const handleGenerateResponse = async () => {
     setGenerating(true);
@@ -50,8 +50,11 @@ export const RichTextEditor = ({ ticketId }: Props) => {
       const data = await response.json();
       setContent(data.response);
     } catch (error) {
-      console.error('Error generating response:', error);
-      alert('Failed to generate response. Please try again.');
+      if (error instanceof Error) {
+        alert(error.message);
+      } else {
+        alert('Failed to generate response. Please try again.');
+      }
     } finally {
       setGenerating(false);
     }
@@ -62,7 +65,6 @@ export const RichTextEditor = ({ ticketId }: Props) => {
 
     setSending(true);
     try {
-      // Get the employee ID for the current user
       const { data: employeeData, error: employeeError } = await supabase
         .from('employees')
         .select('id')
@@ -71,7 +73,6 @@ export const RichTextEditor = ({ ticketId }: Props) => {
 
       if (employeeError) throw employeeError;
 
-      // Add the message
       const { error: messageError } = await supabase
         .from('ticket_messages')
         .insert([{
@@ -84,11 +85,13 @@ export const RichTextEditor = ({ ticketId }: Props) => {
 
       if (messageError) throw messageError;
 
-      // Clear the form
       setContent('');
-    } catch (err) {
-      console.error('Error sending reply:', err);
-      alert('Failed to send reply. Please try again.');
+    } catch (error) {
+      if (error instanceof Error) {
+        alert(error.message);
+      } else {
+        alert('Failed to send reply. Please try again.');
+      }
     } finally {
       setSending(false);
     }
@@ -121,7 +124,7 @@ export const RichTextEditor = ({ ticketId }: Props) => {
           </button>
           {showTemplates && (
             <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-1">
-              {templates.map(template => (
+              {QUICK_TEMPLATES.map(template => (
                 <button
                   key={template.id}
                   onClick={() => handleTemplateSelect(template.content)}

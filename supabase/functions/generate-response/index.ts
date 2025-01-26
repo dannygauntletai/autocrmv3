@@ -36,26 +36,30 @@ interface SimilarMessage {
   similarity: number;
 }
 
+const SIMILARITY_THRESHOLD = 0.78;
+const MAX_TOKENS = 500;
+const TEMPERATURE = 0.7;
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    // Log request details for debugging
-    console.log('Request headers:', Object.fromEntries(req.headers.entries()))
-    console.log('Request method:', req.method)
-    
-    // Check if request has a body
     if (!req.body) {
-      throw new Error('Request has no body')
+      return new Response(
+        JSON.stringify({ 
+          error: 'Request body is required',
+          help: 'Please provide a JSON body with ticketId'
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400
+        }
+      )
     }
 
-    // Get the raw body and log it
     const rawBody = await req.text()
-    console.log('Raw request body:', rawBody)
-
-    // Validate the raw body
     if (!rawBody || rawBody.trim() === '') {
       return new Response(
         JSON.stringify({ 
@@ -69,11 +73,9 @@ serve(async (req) => {
       )
     }
 
-    // Try to parse the JSON
     let parsedBody: RequestBody
     try {
       parsedBody = JSON.parse(rawBody)
-      console.log('Parsed request body:', parsedBody)
     } catch (e) {
       return new Response(
         JSON.stringify({ 
@@ -88,7 +90,6 @@ serve(async (req) => {
       )
     }
 
-    // Validate required fields
     const { ticketId, draftResponse } = parsedBody
     if (!ticketId) {
       return new Response(
@@ -103,7 +104,6 @@ serve(async (req) => {
       )
     }
 
-    // Initialize clients
     const openai = new OpenAI({ 
       apiKey: Deno.env.get('OPENAI_API_KEY')
     })
@@ -127,7 +127,6 @@ serve(async (req) => {
       throw new Error('Missing required environment variables for database connection')
     }
 
-    // Get current ticket messages for context
     const { data: ticketMessages, error: messagesError } = await supabaseClient
       .from('ticket_messages')
       .select('message_body, sender_type, created_at')
@@ -135,11 +134,9 @@ serve(async (req) => {
       .order('created_at', { ascending: true })
 
     if (messagesError) {
-      console.error('Error fetching ticket messages:', messagesError)
       throw messagesError
     }
 
-    // Get ticket details
     const { data: ticket, error: ticketError } = await supabaseClient
       .from('tickets')
       .select('title, description, category, status, priority')
@@ -147,13 +144,10 @@ serve(async (req) => {
       .single()
 
     if (ticketError) {
-      console.error('Error fetching ticket:', ticketError)
       throw ticketError
     }
 
-    // Create embedding for the current context
     const contextForEmbedding = draftResponse || ticket.description || ''
-    console.log('Generating embedding for context:', contextForEmbedding)
     
     const embeddingResponse = await openai.embeddings.create({
       model: "text-embedding-ada-002",
@@ -166,30 +160,23 @@ serve(async (req) => {
 
     const embedding = embeddingResponse.data[0].embedding
 
-    // Query similar messages using vector similarity search
-    console.log('Querying similar messages...')
     const { data: similarMessages, error: similarError } = await supabaseClient.rpc(
       'match_ticket_messages',
       {
         query_embedding: embedding,
-        match_threshold: 0.78, // Increased threshold for better matches
+        match_threshold: SIMILARITY_THRESHOLD,
         match_count: 5
       }
     )
 
     if (similarError) {
-      console.error('Error matching similar messages:', similarError)
       throw similarError
     }
 
-    console.log(`Found ${similarMessages?.length || 0} similar messages`)
-
-    // Prepare conversation context
     const conversationContext = (ticketMessages as TicketMessage[])
       ?.map(msg => `${msg.sender_type.toUpperCase()} (${new Date(msg.created_at).toLocaleString()}): ${msg.message_body}`)
       .join('\n') || ''
 
-    // Prepare similar messages context with metadata
     const similarMessagesContext = (similarMessages as SimilarMessage[])
       ?.map(msg => {
         const teamContext = msg.metadata?.team_name ? ` (handled by ${msg.metadata.team_name})` : ''
@@ -198,7 +185,6 @@ serve(async (req) => {
       })
       .join('\n') || ''
 
-    // Generate response using OpenAI
     const messages = [
       {
         role: "system" as const,
@@ -237,17 +223,15 @@ Please enhance this draft response while maintaining its core message.` : 'Pleas
       }
     ]
 
-    console.log('Generating response...')
     const completion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages,
-      max_tokens: 500,
-      temperature: 0.7,
+      max_tokens: MAX_TOKENS,
+      temperature: TEMPERATURE,
     })
 
     const generatedText = completion.choices[0]?.message?.content || "I apologize, but I couldn't generate a response at this time."
 
-    console.log('Response generated successfully')
     return new Response(
       JSON.stringify({ response: generatedText }),
       {
@@ -257,19 +241,13 @@ Please enhance this draft response while maintaining its core message.` : 'Pleas
     )
 
   } catch (error) {
-    console.error('Error in generate-response:', error)
-    console.error('Error details:', {
-      name: error instanceof Error ? error.name : 'Unknown',
-      message: error instanceof Error ? error.message : 'Unknown',
-      stack: error instanceof Error ? error.stack : 'Unknown',
-      raw: error
-    })
+    const errorResponse = {
+      error: error instanceof Error ? error.message : 'An unknown error occurred',
+      details: error instanceof Error ? error.stack : undefined
+    }
+
     return new Response(
-      JSON.stringify({ 
-        error: error instanceof Error ? error.message : 'An unknown error occurred',
-        details: error instanceof Error ? error.stack : undefined,
-        raw: JSON.stringify(error)
-      }),
+      JSON.stringify(errorResponse),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500
