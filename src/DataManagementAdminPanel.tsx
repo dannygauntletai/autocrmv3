@@ -142,7 +142,7 @@ export const DataManagementAdminPanel = () => {
           </nav>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-auto">
         <div className="p-8">
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -170,6 +170,8 @@ export const DataManagementAdminPanel = () => {
                 <Route path="/create-ticket" element={<CreateTicketForm />} />
               </>
             )}
+            
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </div>
       </div>

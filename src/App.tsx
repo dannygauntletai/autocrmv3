@@ -36,7 +36,6 @@ export function App() {
         <Route path="/customer/*" element={<CustomerPanel />} />
         
         {/* Main route for admin/agent login and dashboard */}
-        <Route path="/" element={!user ? <LoginPanel /> : <DataManagementAdminPanel />} />
         <Route path="/*" element={!user ? <LoginPanel /> : <DataManagementAdminPanel />} />
       </Routes>
     </Router>
