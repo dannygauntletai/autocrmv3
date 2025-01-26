@@ -108,7 +108,9 @@ export const AgentsList = () => {
 
   return <div className="bg-white rounded-lg border border-gray-200">
       <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-        <h3 className="text-lg font-medium text-gray-900">Team Members</h3>
+        <h3 className="text-lg font-medium text-gray-900">
+          Team Members ({teamMembers.length})
+        </h3>
         <button 
           onClick={() => setIsInviteModalOpen(true)} 
           className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"

@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { TeamOverview } from "./TeamOverview";
 import { AgentsList } from "./AgentsList";
 import { supabase } from "./lib/supabaseClient";
 
@@ -52,7 +51,6 @@ export const TeamManagementConsole = () => {
           </p>
         </div>
       </div>
-      <TeamOverview />
       <AgentsList />
     </div>;
 };
