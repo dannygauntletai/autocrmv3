@@ -16,9 +16,10 @@ const FeedbackSubmission = () => {
       try {
         // Get feedback ID and token from URL
         const pathParts = window.location.pathname.split('/');
-        const feedbackId = pathParts[pathParts.length - 2];
-        const rating = pathParts[pathParts.length - 1];
-        const token = new URLSearchParams(window.location.search).get('token');
+        const feedbackId = pathParts[pathParts.length - 1];
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get('token');
+        const rating = params.get('rating');
 
         if (!feedbackId || !rating || !token) {
           throw new Error('Missing required parameters');
@@ -62,10 +63,10 @@ const FeedbackSubmission = () => {
         }
 
         // Redirect to thank you page
-        navigate('/customer/feedback/thank-you');
+        navigate('/feedback/thank-you');
       } catch (error) {
         console.error('Error submitting feedback:', error);
-        navigate('/customer/feedback/error');
+        navigate('/feedback/error');
       }
     };
 
@@ -73,8 +74,11 @@ const FeedbackSubmission = () => {
   }, [navigate]);
 
   return (
-    <div className="flex items-center justify-center min-h-screen">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+    <div className="flex items-center justify-center min-h-screen bg-gray-50">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <p className="text-gray-600">Processing your feedback...</p>
+      </div>
     </div>
   );
 };
@@ -142,7 +146,7 @@ export const CustomerPanel = () => {
     return (
       <div className="min-h-screen bg-gray-50">
         <Routes>
-          <Route path="/feedback/submit/:id/:rating" element={<FeedbackSubmission />} />
+          <Route path="/feedback/submit/:id" element={<FeedbackSubmission />} />
           <Route path="/feedback/thank-you" element={<FeedbackThankYou />} />
           <Route path="/feedback/error" element={<FeedbackError />} />
         </Routes>
