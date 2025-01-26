@@ -1,0 +1,6 @@
+{
+  "imports": {},
+  "tasks": {
+    "scheduled-embeddings": "deno run --allow-net index.ts"
+  }
+} 

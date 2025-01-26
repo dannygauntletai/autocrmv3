@@ -1,0 +1,3 @@
+[functions.scheduled-embeddings]
+verify_jwt = false
+schedule = "0 */4 * * *"  # Run every 4 hours 
