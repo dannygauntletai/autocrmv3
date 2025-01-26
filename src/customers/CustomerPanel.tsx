@@ -18,10 +18,18 @@ const FeedbackSubmission = () => {
         const pathParts = window.location.pathname.split('/');
         const feedbackId = pathParts[pathParts.length - 1];
         const params = new URLSearchParams(window.location.search);
-        const token = params.get('token');
-        const rating = params.get('rating');
+        let token = params.get('token');
+        
+        // Handle rating that's appended to token
+        let rating;
+        if (token && token.includes('/')) {
+          const [actualToken, ratingValue] = token.split('/');
+          token = actualToken;
+          rating = ratingValue;
+        }
 
         if (!feedbackId || !rating || !token) {
+          console.error('Missing parameters:', { feedbackId, rating, token });
           throw new Error('Missing required parameters');
         }
 
@@ -34,6 +42,7 @@ const FeedbackSubmission = () => {
           .single();
 
         if (feedbackError || !feedback) {
+          console.error('Feedback verification failed:', feedbackError);
           throw new Error('Invalid feedback token');
         }
 
@@ -54,6 +63,7 @@ const FeedbackSubmission = () => {
           .eq('token', token);
 
         if (updateError) {
+          console.error('Failed to update feedback:', updateError);
           throw updateError;
         }
 
