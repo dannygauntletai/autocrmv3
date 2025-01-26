@@ -2,16 +2,42 @@ import { Clock, CheckCircle, AlertCircle, Users } from "lucide-react";
 import { useAgentMetrics } from "./hooks/useAgentMetrics";
 import { useTeamMetrics } from "./hooks/useTeamMetrics";
 import { useEmployeeRole } from "./hooks/useEmployeeRole";
+import { useState, useEffect } from "react";
+import { supabase } from "./lib/supabaseClient";
 
 export const DashboardMetricsCards = () => {
   const { role, loading: roleLoading } = useEmployeeRole();
   const { metrics: agentMetrics, loading: agentLoading, error: agentError } = useAgentMetrics();
   const { metrics: teamMetrics, loading: teamLoading, error: teamError } = useTeamMetrics();
+  const [satisfactionScore, setSatisfactionScore] = useState<number | null>(null);
 
   const isSupervisor = role === 'supervisor';
   const metrics = isSupervisor ? teamMetrics : agentMetrics;
   const loading = roleLoading || (isSupervisor ? teamLoading : agentLoading);
   const error = isSupervisor ? teamError : agentError;
+
+  useEffect(() => {
+    const fetchSatisfactionScore = async () => {
+      const { data, error } = await supabase
+        .from('feedback')
+        .select('rating')
+        .eq('status', 'completed')
+        .not('rating', 'is', null);
+
+      if (error) {
+        console.error('Error fetching satisfaction score:', error);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        const average = data.reduce((sum, item) => sum + item.rating, 0) / data.length;
+        // Convert to percentage (e.g., 4/5 -> 0.8 -> 80%)
+        setSatisfactionScore(Math.round((average / 5) * 100));
+      }
+    };
+
+    fetchSatisfactionScore();
+  }, []);
 
   if (loading) {
     return (
@@ -56,7 +82,7 @@ export const DashboardMetricsCards = () => {
     {
       icon: <Users className="h-6 w-6 text-purple-600" />,
       label: "Customer Satisfaction",
-      value: "94%"
+      value: satisfactionScore ? `${satisfactionScore}%` : 'N/A'
     }
   ];
 
