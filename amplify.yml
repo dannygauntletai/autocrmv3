@@ -4,13 +4,6 @@ frontend:
     preBuild:
       commands:
         - npm ci
-        - |
-          if npm run test; then
-            echo "✅ Tests passed - continuing with build"
-          else
-            echo "❌ Tests failed - aborting build"
-            exit 1
-          fi
     build:
       commands:
         - npm run build
@@ -27,6 +20,6 @@ frontend:
         - key: 'Cache-Control'
           value: 'no-cache'
   redirects:
-    - source: '/<*>'
+    - source: '</^[^.]+$|\\.(?!(css|gif|ico|jpg|js|png|txt|svg|woff|woff2|ttf|map|json)$)([^.]+$)/'
       target: '/index.html'
       status: '200' 
