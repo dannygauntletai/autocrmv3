@@ -9,24 +9,18 @@ export const FeedbackSubmission = () => {
     const handleFeedback = async () => {
       try {
         // Get feedback ID and token from URL
-        const pathParts = window.location.pathname.split('/').filter(Boolean); // Remove empty strings
-        console.log('Path parts:', pathParts);
-        
-        // Path format: ['feedback', 'submit', '{id}']
-        const feedbackId = pathParts[2]; // Get the ID from the correct position
-        
+        const pathParts = window.location.pathname.split('/').filter(Boolean);
+        const feedbackId = pathParts[2];
+
         const params = new URLSearchParams(window.location.search);
-        console.log('Search params:', Object.fromEntries(params));
         let token = params.get('token');
-        console.log('Initial token:', token);
-        
+
         // Handle rating that's appended to token (token/rating format)
         let rating;
         if (token && token.includes('/')) {
           const parts = token.split('/');
           token = parts[0];
           rating = parts[1];
-          console.log('Parsed token and rating:', { token, rating });
         }
 
         if (!feedbackId || !rating || !token) {
