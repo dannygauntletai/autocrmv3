@@ -21,7 +21,7 @@ export const CustomerRichTextEditor = ({ ticketId }: Props) => {
       if (!customerEmail) throw new Error('Customer email not found');
       
       // Call the edge function to add the message
-      const { error: functionError } = await supabase.functions.invoke('add-customer-message', {
+      const { error: functionError } = await supabase.functions.invoke('add-message', {
         body: {
           ticket_id: ticketId,
           message_body: content,

@@ -53,7 +53,7 @@ export const TicketDetailCenterSection = ({
       if (newStatus === 'resolved') {
         console.log('Sending feedback request for ticket:', ticketId);
         
-        const { data, error: functionError } = await supabase.functions.invoke('send-feedback-request', {
+        const { data, error: functionError } = await supabase.functions.invoke('request-feedback', {
           body: {
             ticket_id: ticketId,
             customer_email: ticket.email,

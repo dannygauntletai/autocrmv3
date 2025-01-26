@@ -1,9 +1,18 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { crypto } from "https://deno.land/std@0.168.0/crypto/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+// Generate a secure token using customer email and timestamp
+async function generateSecureToken(email: string, timestamp: string): Promise<string> {
+  const data = new TextEncoder().encode(`${email}-${timestamp}`);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
 }
 
 serve(async (req) => {
@@ -17,9 +26,8 @@ serve(async (req) => {
       SUPABASE_URL: Deno.env.get('SUPABASE_URL'),
       SUPABASE_SERVICE_ROLE_KEY: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
       SENDGRID_API_KEY: Deno.env.get('SENDGRID_API_KEY'),
-      PUBLIC_URL_DEV: Deno.env.get('PUBLIC_URL_DEV'),
-      PUBLIC_URL_PROD: Deno.env.get('PUBLIC_URL_PROD'),
-    }
+      PUBLIC_URL: Deno.env.get('PUBLIC_URL_PROD') || Deno.env.get('PUBLIC_URL_DEV')
+    } as const
 
     for (const [key, value] of Object.entries(requiredEnvVars)) {
       if (!value) {
@@ -28,8 +36,8 @@ serve(async (req) => {
     }
 
     const supabaseClient = createClient(
-      requiredEnvVars.SUPABASE_URL,
-      requiredEnvVars.SUPABASE_SERVICE_ROLE_KEY
+      requiredEnvVars.SUPABASE_URL as string,
+      requiredEnvVars.SUPABASE_SERVICE_ROLE_KEY as string
     )
 
     // Get request body
@@ -53,13 +61,21 @@ serve(async (req) => {
       throw new Error('Ticket has no associated email')
     }
 
-    // Create feedback record
+    // Create feedback record with expiry
+    const expiresAt = new Date()
+    expiresAt.setHours(expiresAt.getHours() + 24) // 24 hour expiry
+
+    // Generate secure token
+    const token = await generateSecureToken(ticket.email, expiresAt.toISOString())
+
     const { data: feedback, error: feedbackError } = await supabaseClient
       .from('feedback')
       .insert({
         ticket_id,
         customer_email: ticket.email,
-        status: 'sent'
+        status: 'sent',
+        expires_at: expiresAt.toISOString(),
+        token
       })
       .select()
       .single()
@@ -68,10 +84,12 @@ serve(async (req) => {
       throw new Error('Failed to create feedback record')
     }
 
-    // Determine environment and public URL
-    const isDev = Deno.env.get('DENO_ENV') === 'development'
-    const publicUrl = isDev ? requiredEnvVars.PUBLIC_URL_DEV : requiredEnvVars.PUBLIC_URL_PROD
-    const feedbackUrl = `${publicUrl}/feedback/${feedback.id}`
+    // Generate feedback URLs that point directly to the edge function
+    const feedbackBaseUrl = `${requiredEnvVars.PUBLIC_URL}/feedback/submit/${feedback.id}?token=${token}`
+
+    // Determine environment
+    const isProd = Deno.env.get('PUBLIC_URL_PROD') === requiredEnvVars.PUBLIC_URL
+    const environment = isProd ? 'production' : 'development'
 
     // Send email via SendGrid
     const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
@@ -85,9 +103,9 @@ serve(async (req) => {
         personalizations: [{
           to: [{ email: ticket.email }],
           dynamic_template_data: {
-            environment: isDev ? '(Development Environment)' : '',
+            environment,
             ticket_id,
-            feedback_url: feedbackUrl
+            feedback_url: feedbackBaseUrl
           }
         }],
         from: {
@@ -109,7 +127,7 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('Error in send-feedback-request:', error)
+    console.error('Error in request-feedback:', error)
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'An unknown error occurred' }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
