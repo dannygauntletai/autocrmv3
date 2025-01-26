@@ -78,7 +78,7 @@ export const AgentsList = () => {
         formattedMembers.map(async (member) => {
           const { data: skillsData } = await supabase
             .from('employee_skills')
-            .select('skills')
+            .select('*')
             .eq('employee_id', member.id)
             .single();
 
