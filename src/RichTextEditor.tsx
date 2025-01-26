@@ -35,11 +35,16 @@ export const RichTextEditor = ({ ticketId }: Props) => {
             'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
             'Content-Type': 'application/json',
           },
+          body: JSON.stringify({
+            ticketId,
+            draftResponse: content.trim() || undefined
+          })
         }
       );
 
       if (!response.ok) {
-        throw new Error('Failed to generate response');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate response');
       }
 
       const data = await response.json();
