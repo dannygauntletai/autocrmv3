@@ -5,6 +5,7 @@ import { CustomerLoginPanel } from './components/CustomerLoginPanel';
 import { CustomerPanel } from './customers/CustomerPanel';
 import { CustomerVerify } from './customers/CustomerVerify';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { FeedbackSubmission, FeedbackThankYou, FeedbackError } from './components/FeedbackComponents';
 
 export function App() {
   const { user, loading, error } = useAuth();
@@ -30,6 +31,11 @@ export function App() {
   return (
     <Router>
       <Routes>
+        {/* Public feedback routes */}
+        <Route path="/feedback/submit/:id" element={<FeedbackSubmission />} />
+        <Route path="/feedback/thank-you" element={<FeedbackThankYou />} />
+        <Route path="/feedback/error" element={<FeedbackError />} />
+
         {/* Customer routes - separate flow from admin/agent auth */}
         <Route path="/customer/login" element={<CustomerLoginPanel />} />
         <Route path="/customer/verify" element={<CustomerVerify />} />
