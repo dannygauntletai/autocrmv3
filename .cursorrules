@@ -5,3 +5,5 @@ This codebase appears to be part of a web application built using TypeScript, Re
 # Stack and Key Technologies
 Frontend Framework: React, TypeScript: Used for type-safe code across the frontend.
 Supabase: An open-source Firebase alternative used for backend services like authentication, database, and storage.
+
+don't run supabase secrets set terminal commands
