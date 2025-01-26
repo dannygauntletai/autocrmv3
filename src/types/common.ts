@@ -16,6 +16,7 @@ export interface Ticket {
   description: string;
   tags: string[];
   custom_fields: Record<string, any>;
+  email: string;
 }
 
 export interface TicketListItemType {

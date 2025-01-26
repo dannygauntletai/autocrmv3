@@ -4,6 +4,7 @@ import { InteractionLog } from "./InteractionLog";
 import { RichTextEditor } from "./RichTextEditor";
 import { useTicket } from "./hooks/useTicket";
 import { TicketStatus, TicketPriority } from './types/common';
+import { supabase } from './lib/supabase';
 
 interface Props {
   ticketId: string;
@@ -46,6 +47,34 @@ export const TicketDetailCenterSection = ({
     try {
       setUpdating(true);
       await updateTicketStatus(newStatus);
+
+      // If status is resolved, trigger feedback request
+      console.log('maybe xSending feedback request for ticket:', ticketId);
+      if (newStatus === 'resolved') {
+        console.log('Sending feedback request for ticket:', ticketId);
+        
+        const { data, error: functionError } = await supabase.functions.invoke('send-feedback-request', {
+          body: {
+            ticket_id: ticketId,
+            customer_email: ticket.email,
+            trigger_source: 'ui'
+          }
+        });
+
+        if (functionError) {
+          console.error('Failed to send feedback request:', {
+            error: functionError,
+            ticket: ticketId,
+            email: ticket.email
+          });
+        } else {
+          console.log('Feedback request sent successfully:', {
+            ticket: ticketId,
+            feedback_id: data?.feedback_id
+          });
+        }
+      }
+
       setShowStatusDropdown(false);
     } catch (err) {
       console.error('Failed to update status:', err);
