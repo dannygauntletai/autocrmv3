@@ -191,10 +191,17 @@ serve(async (req) => {
     )
 
     // Get employee data for response context
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(jwt);
+    
+    if (authError || !user) {
+      console.error('Error getting authenticated user:', authError);
+      throw new Error('Could not get authenticated user data');
+    }
+
     const { data: employeeData, error: employeeError } = await supabaseClient
       .from('employees')
       .select('name')
-      .limit(1)
+      .eq('email', user.email)
       .maybeSingle();
 
     if (employeeError || !employeeData) {
