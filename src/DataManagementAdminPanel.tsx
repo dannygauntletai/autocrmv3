@@ -1,5 +1,5 @@
 import { Route, Routes, Link, Navigate, useLocation } from "react-router-dom";
-import { Layout, Database, ClipboardList, FileText, InboxIcon, LayoutDashboard, MessageSquare, Users, GitBranch, Award, Scale, LogOut } from "lucide-react";
+import { Layout, Database, ClipboardList, FileText, InboxIcon, LayoutDashboard, MessageSquare, Users, GitBranch, Award, Scale, LogOut, FileUp } from "lucide-react";
 import { SchemaDefinitionsManager } from "./SchemaDefinitionsManager";
 import { AuditLogViewer } from "./AuditLogViewer";
 import { CreateTicketForm } from "./CreateTicketForm";
@@ -14,6 +14,7 @@ import { LoadBalancingSettings } from "./LoadBalancingSettings";
 import { TeamAdminPanel } from "./TeamAdminPanel";
 import { useAuth } from './hooks/useAuth';
 import { useEmployeeRole } from './hooks/useEmployeeRole';
+import { TeamDocumentsPanel } from "./TeamDocumentsPanel";
 
 const NavLink = ({
   to,
@@ -87,6 +88,10 @@ export const DataManagementAdminPanel = () => {
                     <Users className="h-5 w-5" />
                     My Team
                   </NavLink>
+                  <NavLink to="/team-documents">
+                    <FileUp className="h-5 w-5" />
+                    Team Documents
+                  </NavLink>
                   <NavLink to="/skills">
                     <Award className="h-5 w-5" />
                     Skillsets
@@ -155,6 +160,7 @@ export const DataManagementAdminPanel = () => {
             {isSupervisor && (
               <>
                 <Route path="/team" element={<TeamManagementConsole />} />
+                <Route path="/team-documents" element={<TeamDocumentsPanel />} />
                 <Route path="/skills" element={<SkillsetsPanel />} />
                 <Route path="/load-balancing" element={<LoadBalancingSettings />} />
               </>

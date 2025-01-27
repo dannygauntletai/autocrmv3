@@ -27,6 +27,15 @@ export const RichTextEditor = ({ ticketId }: Props) => {
   const handleGenerateResponse = async () => {
     setGenerating(true);
     try {
+      console.log('Generating response for ticket:', ticketId);
+      console.log('Draft response content:', content.trim() || 'No draft content');
+      
+      const requestBody = {
+        ticketId,
+        draftResponse: content.trim() || undefined
+      };
+      console.log('Request body:', requestBody);
+
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-response`,
         {
@@ -35,24 +44,29 @@ export const RichTextEditor = ({ ticketId }: Props) => {
             'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            ticketId,
-            draftResponse: content.trim() || undefined
-          })
+          body: JSON.stringify(requestBody)
         }
       );
 
+      console.log('Response status:', response.status);
+      const responseData = await response.json();
+      console.log('Response data:', responseData);
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate response');
+        throw new Error(responseData.error || 'Failed to generate response');
       }
 
-      const data = await response.json();
-      setContent(data.response);
+      setContent(responseData.response);
     } catch (error) {
+      console.error('Error in handleGenerateResponse:', error);
       if (error instanceof Error) {
+        console.error('Error details:', {
+          message: error.message,
+          stack: error.stack
+        });
         alert(error.message);
       } else {
+        console.error('Unknown error:', error);
         alert('Failed to generate response. Please try again.');
       }
     } finally {
