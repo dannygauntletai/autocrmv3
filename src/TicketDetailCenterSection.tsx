@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, Clock, ChevronDown } from "lucide-react";
+import { ArrowLeft, Clock, ChevronDown, BookPlus } from "lucide-react";
 import { InteractionLog } from "./InteractionLog";
 import { RichTextEditor } from "./RichTextEditor";
 import { useTicket } from "./hooks/useTicket";
@@ -22,6 +22,9 @@ export const TicketDetailCenterSection = ({
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [showPriorityDropdown, setShowPriorityDropdown] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [showKbConfirmation, setShowKbConfirmation] = useState(false);
+  const [addingToKb, setAddingToKb] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (loading) {
     return (
@@ -92,6 +95,36 @@ export const TicketDetailCenterSection = ({
       console.error('Failed to update priority:', err);
     } finally {
       setUpdating(false);
+    }
+  };
+
+  const handleAddToKnowledgeBase = async () => {
+    try {
+      setAddingToKb(true);
+      setErrorMessage(null);
+      
+      const response = await supabase.functions.invoke('add-knowledgebase', {
+        body: { ticketId }
+      });
+
+      // Check response error
+      if (response.error) {
+        const error = response.error as { message: string; status?: number };
+        if (error.status === 422) {
+          setErrorMessage('This ticket does not contain sufficient information to create a knowledge base article.');
+          return;
+        }
+        throw error;
+      }
+
+      // Show success message
+      alert('Successfully added to knowledge base!');
+      setShowKbConfirmation(false);
+    } catch (err) {
+      console.error('Failed to add to knowledge base:', err);
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to add to knowledge base. Please try again.');
+    } finally {
+      setAddingToKb(false);
     }
   };
 
@@ -176,6 +209,13 @@ export const TicketDetailCenterSection = ({
               </div>
             )}
           </div>
+          <button
+            onClick={() => setShowKbConfirmation(true)}
+            className="inline-flex items-center px-3 py-1 border border-transparent rounded-full text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            <BookPlus className="h-3 w-3 mr-1" />
+            Add to Knowledge Base
+          </button>
         </div>
       </div>
 
@@ -188,6 +228,51 @@ export const TicketDetailCenterSection = ({
       <div className="flex-shrink-0 border-t border-gray-200 bg-gray-50 p-6">
         <RichTextEditor ticketId={ticketId} />
       </div>
+
+      {/* Confirmation Dialog */}
+      {showKbConfirmation && (
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">
+              Add to Knowledge Base?
+            </h3>
+            <p className="text-sm text-gray-500 mb-4">
+              This will create a new knowledge base article based on this ticket's conversation. The content will be automatically generated and anonymized.
+            </p>
+            {errorMessage && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+                <p className="text-sm text-red-600">{errorMessage}</p>
+              </div>
+            )}
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowKbConfirmation(false);
+                  setErrorMessage(null);
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                disabled={addingToKb}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddToKnowledgeBase}
+                disabled={addingToKb}
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                {addingToKb ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                    Processing...
+                  </>
+                ) : (
+                  'Confirm'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

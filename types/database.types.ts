@@ -147,6 +147,86 @@ export type Database = {
         }
         Relationships: []
       }
+      kb_articles: {
+        Row: {
+          category_id: string | null
+          content: string
+          created_at: string
+          created_by: string
+          id: string
+          tags: string[] | null
+          ticket_id: string | null
+          title: string
+        }
+        Insert: {
+          category_id?: string | null
+          content: string
+          created_at?: string
+          created_by: string
+          id?: string
+          tags?: string[] | null
+          ticket_id?: string | null
+          title: string
+        }
+        Update: {
+          category_id?: string | null
+          content?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          tags?: string[] | null
+          ticket_id?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kb_articles_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "kb_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kb_articles_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "employee_metrics"
+            referencedColumns: ["employee_id"]
+          },
+          {
+            foreignKeyName: "kb_articles_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kb_articles_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kb_categories: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       macros_templates: {
         Row: {
           content: string
@@ -432,7 +512,21 @@ export type Database = {
       }
     }
     Functions: {
-      [_ in never]: never
+      search_kb_articles: {
+        Args: {
+          search_query: string
+        }
+        Returns: {
+          category_id: string | null
+          content: string
+          created_at: string
+          created_by: string
+          id: string
+          tags: string[] | null
+          ticket_id: string | null
+          title: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

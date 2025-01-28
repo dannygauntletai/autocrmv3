@@ -61,3 +61,13 @@ export interface Employee {
   id: string;
   name: string;
 }
+
+export interface TicketMessage {
+  id: string;
+  ticket_id: string;
+  message_body: string;
+  sender_type: string;
+  created_at: string;
+  metadata?: Record<string, any>;
+  attachments?: string[];
+}
