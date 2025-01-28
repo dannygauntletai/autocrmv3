@@ -9,6 +9,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import OpenAI from "https://esm.sh/openai@4"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { traceable } from "npm:langsmith@0.1.41/traceable"
+import { wrapOpenAI } from "npm:langsmith@0.1.41/wrappers"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -155,9 +156,9 @@ serve(async (req) => {
     console.log('Draft response:', draftResponse);
 
     // Check OpenAI configuration
-    const openai = new OpenAI({ 
+    const openai = wrapOpenAI(new OpenAI({ 
       apiKey: Deno.env.get('OPENAI_API_KEY')
-    })
+    }));
     console.log('OpenAI API key configured:', !!openai.apiKey);
 
     if (!openai.apiKey) {
@@ -454,17 +455,27 @@ ${draftResponse ? `I've started drafting this response: ${draftResponse}` : 'Ple
 
     console.time('responseGeneration');
     const generatedText = await traceable(
-      async () => {
+      async function generateResponse() {
         const completion = await openai.chat.completions.create({
           model: "gpt-4",
           messages,
           max_tokens: MAX_TOKENS,
-          temperature: TEMPERATURE,
+          temperature: TEMPERATURE
         });
         return completion.choices[0]?.message?.content || "I apologize, but I couldn't generate a response at this time.";
       },
       {
         name: "Response Generation",
+        inputs: {
+          conversationHistoryLength: context.stats.conversationHistoryLength,
+          similarMessagesCount: context.stats.similarMessagesCount,
+          relevantDocsCount: context.stats.relevantDocsCount,
+          similarMessages: similarMessages.map(m => ({ similarity: m.similarity })),
+          relevantDocs: relevantDocs.map(d => ({ 
+            filename: d.metadata.filename,
+            similarity: d.similarity 
+          }))
+        },
         metadata: {
           ticketId,
           model: "gpt-4",
