@@ -4,6 +4,7 @@ import { CustomFieldsPanel } from "./CustomFieldsPanel";
 import { EmployeeAssignmentPanel } from "./EmployeeAssignmentPanel";
 import { TicketDetailCenterSection } from "./TicketDetailCenterSection";
 import { useState } from "react";
+import { AIChatbot } from "./AIChatbot";
 
 interface Props {
   ticketId: string;
@@ -16,6 +17,7 @@ export const TicketDetailView = ({
 }: Props) => {
   // Keep track of the currently viewed ticket
   const [currentTicketId, setCurrentTicketId] = useState(initialTicketId);
+  const [showAIChat, setShowAIChat] = useState(false);
 
   const handleTicketSelect = (id: string) => {
     // Just update the current ticket ID
@@ -33,6 +35,19 @@ export const TicketDetailView = ({
         <InternalNotesPanel ticketId={currentTicketId} />
         <CustomFieldsPanel ticketId={currentTicketId} />
       </div>
+      
+      {/* AI Chatbot with context */}
+      {showAIChat && (
+        <AIChatbot 
+          onClose={() => setShowAIChat(false)}
+          currentView={{
+            type: 'ticket_detail',
+            data: {
+              ticketId: currentTicketId
+            }
+          }}
+        />
+      )}
     </div>
   );
 };

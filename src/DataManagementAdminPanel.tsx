@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { Route, Routes, Link, Navigate, useLocation } from "react-router-dom";
-import { Layout, Database, ClipboardList, FileText, InboxIcon, LayoutDashboard, MessageSquare, Users, GitBranch, Award, Scale, LogOut, FileUp } from "lucide-react";
+import { Layout, Database, ClipboardList, FileText, InboxIcon, LayoutDashboard, MessageSquare, Users, GitBranch, Award, Scale, LogOut, FileUp, Bot } from "lucide-react";
 import { SchemaDefinitionsManager } from "./SchemaDefinitionsManager";
 import { AuditLogViewer } from "./AuditLogViewer";
 import { CreateTicketForm } from "./CreateTicketForm";
@@ -15,6 +16,7 @@ import { TeamAdminPanel } from "./TeamAdminPanel";
 import { useAuth } from './hooks/useAuth';
 import { useEmployeeRole } from './hooks/useEmployeeRole';
 import { TeamDocumentsPanel } from "./TeamDocumentsPanel";
+import { AIChatbot } from "./AIChatbot";
 
 const NavLink = ({
   to,
@@ -33,6 +35,7 @@ const NavLink = ({
 export const DataManagementAdminPanel = () => {
   const { signOut } = useAuth();
   const { role, loading } = useEmployeeRole();
+  const [showAIChat, setShowAIChat] = useState(false);
 
   if (loading) {
     return (
@@ -135,7 +138,14 @@ export const DataManagementAdminPanel = () => {
               </div>
             )}
 
-            <div className="pt-6 border-t border-gray-200">
+            <div className="pt-6 space-y-2 border-t border-gray-200">
+              <button
+                onClick={() => setShowAIChat(prev => !prev)}
+                className="flex items-center gap-2 px-3 py-2 w-full text-left rounded-md hover:bg-gray-50 text-gray-700"
+              >
+                <Bot className="h-5 w-5" />
+                AI Assistant
+              </button>
               <button
                 onClick={signOut}
                 className="flex items-center gap-2 px-3 py-2 w-full text-left rounded-md hover:bg-gray-50 text-gray-700"
@@ -181,6 +191,9 @@ export const DataManagementAdminPanel = () => {
           </Routes>
         </div>
       </div>
+
+      {/* AI Chatbot */}
+      {showAIChat && <AIChatbot onClose={() => setShowAIChat(false)} />}
     </div>
   );
 };
