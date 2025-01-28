@@ -1,3 +1,13 @@
 {
-  "imports": {}
+  "imports": {
+    "@langchain/openai": "npm:@langchain/openai@0.4.2",
+    "@langchain/core": "npm:@langchain/core@0.1.63",
+    "@langchain/core/agents": "npm:@langchain/core@0.1.63/agents",
+    "@langchain/core/prompts": "npm:@langchain/core@0.1.63/prompts",
+    "@langchain/core/runnables": "npm:@langchain/core@0.1.63/runnables",
+    "@langchain/core/output_parsers": "npm:@langchain/core@0.1.63/output_parsers",
+    "@langchain/core/schema": "npm:@langchain/core@0.1.63/schema",
+    "@langchain/core/messages": "npm:@langchain/core@0.1.63/messages",
+    "@langchain/core/base": "npm:@langchain/core@0.1.63/base"
+  }
 }
