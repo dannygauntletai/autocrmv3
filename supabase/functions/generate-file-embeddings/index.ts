@@ -1,6 +1,9 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import OpenAI from 'https://esm.sh/openai@4';
+import { traceable } from "npm:langsmith@0.1.41/traceable";
+import { wrapOpenAI } from "npm:langsmith@0.1.41/wrappers";
+import { RecursiveCharacterTextSplitter } from "npm:langchain/text_splitter";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -39,7 +42,7 @@ serve(async (req) => {
 
     // Initialize clients
     const supabaseClient = createClient(supabaseUrl, supabaseKey);
-    const openai = new OpenAI({ apiKey: openaiKey });
+    const openai = wrapOpenAI(new OpenAI({ apiKey: openaiKey }));
 
     // Parse request
     const requestText = await req.text();
@@ -97,41 +100,67 @@ serve(async (req) => {
       .replace(/[\uFFFD\uFFFE\uFFFF]/g, '') // Remove invalid Unicode
       .replace(/[^\x20-\x7E\n\r\t]/g, ' ') // Replace non-printable chars with space
 
-    // Split content into chunks of roughly 1000 characters
-    const chunkSize = 1000
-    const overlap = 200
-    const chunks: string[] = []
-    let currentIndex = 0
+    // Split content into chunks using LangChain's splitter
+    const chunkSize = 1000;
+    const overlap = 200;
 
-    while (currentIndex < sanitizedContent.length) {
-      // Find a good break point near the chunk size
-      let endIndex = Math.min(currentIndex + chunkSize, sanitizedContent.length)
-      if (endIndex < sanitizedContent.length) {
-        // Try to break at a period, newline, or space
-        const breakPoint = sanitizedContent.substring(endIndex - 50, endIndex).search(/[.\n ]/)
-        if (breakPoint !== -1) {
-          endIndex = endIndex - 50 + breakPoint + 1
+    // Process content into chunks with tracing
+    const { chunks, nonEmptyChunks } = await traceable(
+      async function processChunks() {
+        const textSplitter = new RecursiveCharacterTextSplitter({
+          chunkSize,
+          chunkOverlap: overlap,
+          separators: ["\n\n", "\n", " ", ""], // Prioritize splitting at paragraph breaks, then newlines, then spaces
+          lengthFunction: (text) => text.length,
+        });
+
+        const chunks = await textSplitter.splitText(sanitizedContent);
+        const nonEmptyChunks = chunks.filter(chunk => chunk.length > 0);
+        return { chunks, nonEmptyChunks };
+      },
+      {
+        name: "Content Chunking",
+        inputs: {
+          contentLength: sanitizedContent.length,
+          chunkSize,
+          overlap,
+          splitter: "RecursiveCharacterTextSplitter"
+        },
+        metadata: {
+          fileId,
+          fileName: file.filename,
+          fileType: file.file_type
         }
       }
-      
-      chunks.push(sanitizedContent.substring(currentIndex, endIndex).trim())
-      currentIndex = Math.max(endIndex - overlap, currentIndex + 1)
-    }
+    )();
 
-    // Process non-empty chunks
-    const nonEmptyChunks = chunks.filter(chunk => chunk.length > 0)
+    console.log(`Processing ${nonEmptyChunks.length} chunks`);
 
-    console.log(`Processing ${nonEmptyChunks.length} chunks`)
-
-    // Generate embeddings for each chunk
+    // Generate embeddings for each chunk with tracing
     for (const chunk of nonEmptyChunks) {
       try {
-        const embeddingResponse = await openai.embeddings.create({
-          model: 'text-embedding-ada-002',
-          input: chunk
-        })
+        const { embedding } = await traceable(
+          async function generateEmbedding() {
+            const embeddingResponse = await openai.embeddings.create({
+              model: 'text-embedding-ada-002',
+              input: chunk
+            });
 
-        const [{ embedding }] = embeddingResponse.data
+            return { embedding: embeddingResponse.data[0].embedding };
+          },
+          {
+            name: "Embedding Generation",
+            inputs: {
+              chunkLength: chunk.length,
+              chunkIndex: chunks.indexOf(chunk)
+            },
+            metadata: {
+              fileId,
+              model: 'text-embedding-ada-002',
+              totalChunks: chunks.length
+            }
+          }
+        )();
 
         // Store the embedding
         console.log('Attempting to store embedding for chunk:', {
