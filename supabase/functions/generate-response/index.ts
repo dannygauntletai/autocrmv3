@@ -8,6 +8,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import OpenAI from "https://esm.sh/openai@4"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { traceable } from "npm:langsmith@0.1.41/traceable"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -311,8 +312,8 @@ serve(async (req) => {
     }
 
     // Find similar messages
-    let similarMessages = [];
-    let relevantDocs = [];
+    let similarMessages: SimilarMessage[] = [];
+    let relevantDocs: RelevantDocument[] = [];
 
     console.log('Finding similar messages...');
     try {
@@ -359,25 +360,68 @@ serve(async (req) => {
 
     // Prepare context
     console.log('Preparing context for GPT...');
-    const conversationHistory = ticket.ticket_messages
-      .sort((a: Database['public']['Tables']['ticket_messages']['Row'], 
-             b: Database['public']['Tables']['ticket_messages']['Row']) => 
-        new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-      .map((msg: Database['public']['Tables']['ticket_messages']['Row']) => 
-        `${msg.sender_type.toUpperCase()}: ${msg.message_body}`)
-      .join('\n\n')
+    
+    // Ensure LangSmith environment variables are set
+    if (!Deno.env.get("LANGCHAIN_API_KEY")) {
+      console.warn("LANGCHAIN_API_KEY not set - tracing will not be available");
+    }
+    if (!Deno.env.get("LANGCHAIN_ENDPOINT")) {
+      console.warn("LANGCHAIN_ENDPOINT not set - using default endpoint");
+    }
+    
+    const context = await (async () => {
+      console.time('contextPreparation');
+      const result = await traceable(
+        async () => {
+          try {
+            const conversationHistory = ticket.ticket_messages
+              .sort((a: Database['public']['Tables']['ticket_messages']['Row'], 
+                     b: Database['public']['Tables']['ticket_messages']['Row']) => 
+                new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+              .map((msg: Database['public']['Tables']['ticket_messages']['Row']) => 
+                `${msg.sender_type.toUpperCase()}: ${msg.message_body}`)
+              .join('\n\n')
 
-    const similarMessagesContext = similarMessages.length > 0
-      ? `\nSimilar past conversations:\n${similarMessages
-          .map((m: SimilarMessage) => `- ${m.message_body} (Similarity: ${m.similarity.toFixed(2)})`)
-          .join('\n')}`
-      : ''
+            const similarMessagesContext = similarMessages.length > 0
+              ? `\nSimilar past conversations:\n${similarMessages
+                  .map((m: SimilarMessage) => `- ${m.message_body} (Similarity: ${m.similarity.toFixed(2)})`)
+                  .join('\n')}`
+              : ''
 
-    const relevantDocsContext = relevantDocs.length > 0
-      ? `\nRelevant team documents:\n${relevantDocs
-          .map((d: RelevantDocument) => `- From "${d.metadata.filename}": ${d.content} (Similarity: ${d.similarity.toFixed(2)})`)
-          .join('\n')}`
-      : ''
+            const relevantDocsContext = relevantDocs.length > 0
+              ? `\nRelevant team documents:\n${relevantDocs
+                  .map((d: RelevantDocument) => `- From "${d.metadata.filename}": ${d.content} (Similarity: ${d.similarity.toFixed(2)})`)
+                  .join('\n')}`
+              : ''
+
+            return {
+              conversationHistory,
+              similarMessagesContext,
+              relevantDocsContext,
+              stats: {
+                conversationHistoryLength: conversationHistory.length,
+                similarMessagesCount: similarMessages.length,
+                relevantDocsCount: relevantDocs.length
+              }
+            }
+          } catch (error) {
+            console.error("Error in context preparation:", error);
+            throw error;
+          }
+        },
+        { 
+          name: "Context Preparation",
+          metadata: {
+            ticketId,
+            latestMessageId: latestMessage.id,
+            similarMessagesCount: similarMessages.length,
+            relevantDocsCount: relevantDocs.length
+          }
+        }
+      )();
+      console.timeEnd('contextPreparation');
+      return result;
+    })();
 
     // Generate response
     console.log('Generating GPT response...');
@@ -400,23 +444,38 @@ Status: ${ticket.status}
 Priority: ${ticket.priority}
 
 Conversation History:
-${conversationHistory}
-${similarMessagesContext}
-${relevantDocsContext}
+${context.conversationHistory}
+${context.similarMessagesContext}
+${context.relevantDocsContext}
 
 ${draftResponse ? `I've started drafting this response: ${draftResponse}` : 'Please generate a response to the latest message.'}`
       }
     ]
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages,
-      max_tokens: MAX_TOKENS,
-      temperature: TEMPERATURE,
-    })
-
-    const generatedText = completion.choices[0]?.message?.content || "I apologize, but I couldn't generate a response at this time."
-    console.log('Response generated successfully');
+    console.time('responseGeneration');
+    const generatedText = await traceable(
+      async () => {
+        const completion = await openai.chat.completions.create({
+          model: "gpt-4",
+          messages,
+          max_tokens: MAX_TOKENS,
+          temperature: TEMPERATURE,
+        });
+        return completion.choices[0]?.message?.content || "I apologize, but I couldn't generate a response at this time.";
+      },
+      {
+        name: "Response Generation",
+        metadata: {
+          ticketId,
+          model: "gpt-4",
+          maxTokens: MAX_TOKENS,
+          temperature: TEMPERATURE,
+          messageCount: messages.length,
+          draftProvided: !!draftResponse
+        }
+      }
+    )();
+    console.timeEnd('responseGeneration');
 
     return new Response(
       JSON.stringify({

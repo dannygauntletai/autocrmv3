@@ -8,6 +8,7 @@
     "@langchain/core/output_parsers": "npm:@langchain/core@0.1.63/output_parsers",
     "@langchain/core/schema": "npm:@langchain/core@0.1.63/schema",
     "@langchain/core/messages": "npm:@langchain/core@0.1.63/messages",
-    "@langchain/core/base": "npm:@langchain/core@0.1.63/base"
+    "@langchain/core/base": "npm:@langchain/core@0.1.63/base",
+    "npm:langsmith@0.1.41": "npm:langsmith@0.1.41_openai@4.55.4__zod@3.23.8_zod@3.23.8"
   }
 }
