@@ -160,24 +160,27 @@ export const AIChatbot = ({
     setIsLoading(true);
 
     try {
-      const input = inputValue.toLowerCase();
       let response = "";
 
-      // Navigation commands
-      if (input.includes('go to') || input.includes('show') || input.includes('open')) {
-        if (input.includes('ticket') && !input.includes('tickets')) {
-          const ticketId = currentView?.data?.ticketId || input.match(/ticket (\w{8}-\w{4}-\w{4}-\w{4}-\w{12})/)?.[1];
-          if (ticketId) {
-            response = handleNavigation(`/tickets/${ticketId}`);
-          }
-        } else if (input.includes('tickets')) {
-          response = handleNavigation('/tickets');
-        } else if (input.includes('dashboard')) {
-          response = handleNavigation('/dashboard');
+      // Send every query to the routing function
+      const { data: routeData, error: routeError } = await supabase.functions.invoke('sidebar-router', {
+        body: {
+          query: inputValue,
+          email: user?.email
         }
+      });
+
+      if (routeError) throw routeError;
+
+      // Handle routing response
+      if (routeData?.route) {
+        response = handleNavigation(routeData.route);
+      } else if (routeData?.message) {
+        response = routeData.message;
       }
-      // Context-aware ticket commands
-      else if (currentView?.type === 'ticket_detail' && currentView.data?.ticketId) {
+      
+      // If not a routing request, handle ticket-specific commands
+      if (!response && currentView?.type === 'ticket_detail' && currentView.data?.ticketId) {
         const ticketId = currentView.data.ticketId;
         
         if (!currentTicket) {
@@ -185,31 +188,31 @@ export const AIChatbot = ({
           setCurrentTicket(ticket);
         }
         
-        if (input.includes('status')) {
-          const status = input.includes('resolved') ? 'resolved' : 
-                        input.includes('pending') ? 'pending' : 'open';
+        if (inputValue.includes('status')) {
+          const status = inputValue.includes('resolved') ? 'resolved' : 
+                        inputValue.includes('pending') ? 'pending' : 'open';
           await updateTicketStatus(ticketId, status as TicketStatus);
           response = `Updated ticket "${currentTicket?.title}" status from ${currentTicket?.status} to ${status}`;
           setCurrentTicket(prev => prev ? { ...prev, status } : null);
         } 
-        else if (input.includes('priority')) {
-          const priority = input.includes('high') ? 'high' : 
-                          input.includes('medium') ? 'medium' : 'low';
+        else if (inputValue.includes('priority')) {
+          const priority = inputValue.includes('high') ? 'high' : 
+                          inputValue.includes('medium') ? 'medium' : 'low';
           await updateTicketPriority(ticketId, priority as TicketPriority);
           response = `Updated ticket "${currentTicket?.title}" priority from ${currentTicket?.priority} to ${priority}`;
           setCurrentTicket(prev => prev ? { ...prev, priority } : null);
         }
-        else if (input.includes('respond') || input.includes('reply')) {
-          const message = input.includes('with') ? 
-            input.split('with')[1]?.trim() : 
-            input.replace(/respond|reply/i, '').trim();
+        else if (inputValue.includes('respond') || inputValue.includes('reply')) {
+          const message = inputValue.includes('with') ? 
+            inputValue.split('with')[1]?.trim() : 
+            inputValue.replace(/respond|reply/i, '').trim();
           
           if (message) {
             await addTicketMessage(ticketId, message);
             response = `Added your response to ticket "${currentTicket?.title}"`;
           }
         }
-        else if (input.includes('summary') || input.includes('details')) {
+        else if (inputValue.includes('summary') || inputValue.includes('details')) {
           response = currentTicket ? 
             `Ticket: "${currentTicket.title}"\nStatus: ${currentTicket.status}\nPriority: ${currentTicket.priority}\nMessages: ${currentTicket.ticket_messages?.length || 0}` :
             "Sorry, I couldn't fetch the ticket details.";
@@ -225,8 +228,8 @@ export const AIChatbot = ({
             "- Respond (e.g., 'respond with [your message]')\n" +
             "- View summary (e.g., 'show ticket summary')"
           : "I can help you with:\n" +
-            "- Navigation (e.g., 'go to tickets', 'go to dashboard')\n" +
-            "- View specific tickets (e.g., 'show ticket [ID]')\n" +
+            "- Navigation (just tell me where you want to go)\n" +
+            "- View specific tickets\n" +
             "- Manage tickets when viewing them";
       }
 

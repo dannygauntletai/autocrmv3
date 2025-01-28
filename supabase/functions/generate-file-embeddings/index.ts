@@ -136,71 +136,87 @@ serve(async (req) => {
 
     console.log(`Processing ${nonEmptyChunks.length} chunks`);
 
-    // Generate embeddings for each chunk with tracing
-    for (const chunk of nonEmptyChunks) {
-      try {
-        const { embedding } = await traceable(
-          async function generateEmbedding() {
+    // Generate embeddings for all chunks in a single trace
+    const embeddings = await traceable(
+      async function generateEmbeddings() {
+        const results = [];
+        for (const chunk of nonEmptyChunks) {
+          try {
             const embeddingResponse = await openai.embeddings.create({
               model: 'text-embedding-ada-002',
               input: chunk
             });
 
-            return { embedding: embeddingResponse.data[0].embedding };
-          },
-          {
-            name: "Embedding Generation",
-            inputs: {
-              chunkLength: chunk.length,
-              chunkIndex: chunks.indexOf(chunk)
-            },
-            metadata: {
+            const embedding = embeddingResponse.data[0].embedding;
+
+            // Store the embedding
+            console.log('Attempting to store embedding for chunk:', {
               fileId,
-              model: 'text-embedding-ada-002',
-              totalChunks: chunks.length
+              chunkIndex: chunks.indexOf(chunk),
+              contentLength: chunk.length,
+              hasEmbedding: !!embedding
+            });
+
+            const { data: insertData, error: insertError } = await supabaseClient
+              .from('file_embeddings')
+              .insert({
+                file_id: fileId,
+                chunk_index: chunks.indexOf(chunk),
+                content: chunk,
+                embedding,
+                metadata: {
+                  total_chunks: chunks.length
+                }
+              });
+
+            if (insertError) {
+              console.error('Error inserting embedding:', {
+                error: insertError,
+                fileId,
+                chunkIndex: chunks.indexOf(chunk)
+              });
+              throw insertError;
             }
+
+            console.log('Successfully stored embedding:', {
+              fileId,
+              chunkIndex: chunks.indexOf(chunk),
+              insertData
+            });
+
+            results.push({
+              chunkIndex: chunks.indexOf(chunk),
+              success: true
+            });
+          } catch (error) {
+            console.error('Error generating embedding for chunk:', error);
+            results.push({
+              chunkIndex: chunks.indexOf(chunk),
+              success: false,
+              error: error instanceof Error ? error.message : 'Unknown error'
+            });
+            throw error;
           }
-        )();
-
-        // Store the embedding
-        console.log('Attempting to store embedding for chunk:', {
-          fileId,
-          chunkIndex: chunks.indexOf(chunk),
-          contentLength: chunk.length,
-          hasEmbedding: !!embedding
-        });
-
-        const { data: insertData, error: insertError } = await supabaseClient
-          .from('file_embeddings')
-          .insert({
-            file_id: fileId,
-            chunk_index: chunks.indexOf(chunk),
-            content: chunk,
-            embedding,
-            metadata: {
-              total_chunks: chunks.length
-            }
-          });
-
-        if (insertError) {
-          console.error('Error inserting embedding:', {
-            error: insertError,
-            fileId,
-            chunkIndex: chunks.indexOf(chunk)
-          });
-          throw insertError;
         }
-
-        console.log('Successfully stored embedding:', {
+        return results;
+      },
+      {
+        name: "Embeddings Generation",
+        inputs: {
+          chunks: nonEmptyChunks.map((chunk, index) => ({
+            chunkIndex: index,
+            chunkLength: chunk.length
+          }))
+        },
+        metadata: {
           fileId,
-          chunkIndex: chunks.indexOf(chunk),
-          insertData
-        });
-      } catch (error) {
-        console.error('Error generating embedding for chunk:', error)
-        throw error
+          fileName: file.filename,
+          fileType: file.file_type,
+          model: 'text-embedding-ada-002',
+          totalChunks: nonEmptyChunks.length
+        }
       }
-    }
+    )();
 
     return new Response(
       JSON.stringify({
