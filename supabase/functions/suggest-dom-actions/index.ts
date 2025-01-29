@@ -8,7 +8,7 @@ import OpenAI from "https://esm.sh/openai@4"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-last-action-category',
 }
 
 interface DOMElement {
@@ -35,40 +35,115 @@ interface AgentAction {
   y: number;
   elementType: string;
   confidence: number;
+  category: 'navigation' | 'content' | 'action';
+}
+
+// Simple in-memory cache with TTL
+const cache = new Map<string, { data: AgentAction[]; timestamp: number }>();
+const CACHE_TTL = 30000; // 30 seconds
+
+// Clean up old cache entries
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of cache.entries()) {
+    if (now - value.timestamp > CACHE_TTL) {
+      cache.delete(key);
+    }
+  }
+}, CACHE_TTL);
+
+// Helper to generate cache key
+function generateCacheKey(elements: DOMElement[], lastActionCategory: string | null): string {
+  // Use paths and last action category as cache key
+  return JSON.stringify({
+    paths: elements.map(e => e.path),
+    lastActionCategory
+  });
+}
+
+// Preprocess elements to reduce token usage
+function preprocessElements(elements: DOMElement[]): DOMElement[] {
+  return elements.map(element => ({
+    id: element.id,
+    description: element.description,
+    x: element.x,
+    y: element.y,
+    elementType: element.elementType,
+    path: element.path,
+    confidence: element.confidence,
+    // Only include these if they add new information
+    ...(element.text !== element.description && { text: element.text }),
+    ...(element.role !== element.elementType && { role: element.role }),
+    ...(element.ariaLabel !== element.description && { ariaLabel: element.ariaLabel })
+  }));
 }
 
 async function filterImportantElements(openai: OpenAI, elements: DOMElement[]): Promise<DOMElement[]> {
-  const response = await openai.chat.completions.create({
-    model: "gpt-3.5-turbo",
-    messages: [
-      {
-        role: "system",
-        content: `You are a DOM element analyzer that identifies the most important interactive elements on a page.
-You must respond with ONLY a JSON object in this exact format: {"indices": [0, 1, 2, ...]}
-
-Consider these factors when selecting elements:
-1. Primary navigation elements
-2. Main action buttons
-3. Important form inputs
-4. Key interactive elements
-
-DO NOT include any explanatory text or other content in your response.`
-      },
-      {
-        role: "user",
-        content: JSON.stringify(elements)
-      }
-    ],
-    max_tokens: 500,
-    temperature: 0
-  });
-
   try {
-    const indices = JSON.parse(response.choices[0].message.content || '{"indices": []}').indices || [];
-    return indices.map((index: number) => elements[index]).filter(Boolean);
+    const response = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [
+        {
+          role: "system",
+          content: `You are a DOM element analyzer. Return ONLY a JSON array of indices of important elements.
+Example response: {"indices": [0, 1, 2]}
+Important: 
+1. Response must be valid JSON
+2. Only include the indices array
+3. No explanations or additional text
+4. Max 20 indices`
+        },
+        {
+          role: "user",
+          content: JSON.stringify(elements.map((e: DOMElement, i: number) => ({ 
+            index: i,
+            description: e.description,
+            elementType: e.elementType,
+            role: e.role
+          })))
+        }
+      ],
+      max_tokens: 150,
+      temperature: 0,
+      response_format: { type: "json_object" }
+    });
+
+    const content = response.choices[0].message.content;
+    console.log('Filter response:', content);
+
+    if (!content) {
+      console.warn('Empty response from filter');
+      return elements.slice(0, 20);
+    }
+
+    try {
+      const parsed = JSON.parse(content);
+      if (!parsed || !Array.isArray(parsed.indices)) {
+        console.warn('Invalid response format:', content);
+        return elements.slice(0, 20);
+      }
+
+      // Ensure indices are valid numbers and within bounds
+      const validIndices = parsed.indices
+        .filter((i: unknown): i is number => 
+          typeof i === 'number' && 
+          Number.isInteger(i) && 
+          i >= 0 && 
+          i < elements.length
+        );
+
+      if (validIndices.length === 0) {
+        console.warn('No valid indices found');
+        return elements.slice(0, 20);
+      }
+
+      return validIndices.map(i => elements[i]);
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError, 'Content:', content);
+      return elements.slice(0, 20);
+    }
   } catch (error) {
-    console.error('Error parsing important elements:', error);
-    // If parsing fails, return first 20 elements as fallback
+    console.error('Filter error:', error);
     return elements.slice(0, 20);
   }
 }
@@ -85,73 +160,82 @@ serve(async (req) => {
     })
 
     const { elements } = await req.json() as RequestBody
+    const lastActionCategory = req.headers.get('X-Last-Action-Category');
+
+    // Check cache first
+    const cacheKey = generateCacheKey(elements, lastActionCategory);
+    const cachedResult = cache.get(cacheKey);
+    if (cachedResult && Date.now() - cachedResult.timestamp < CACHE_TTL) {
+      console.log('Cache hit!');
+      return new Response(
+        JSON.stringify({ actions: cachedResult.data }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200 
+        }
+      );
+    }
+
+    // Preprocess elements to reduce token usage
+    const processedElements = preprocessElements(elements);
 
     // Pre-filter important elements if we have too many
-    const importantElements = elements.length > 30 
-      ? await filterImportantElements(openai, elements)
-      : elements;
+    const importantElements = processedElements.length > 30 
+      ? await filterImportantElements(openai, processedElements)
+      : processedElements;
 
-    const response = await openai.chat.completions.create({
+    // Use streaming for faster initial response
+    const stream = await openai.chat.completions.create({
       model: "gpt-4",
       messages: [
         {
           role: "system",
-          content: `You are an AI assistant that analyzes web application DOM elements to suggest the most relevant interactive elements for the user's current context. 
-
-You must respond with ONLY a JSON array in this exact format:
-[
-  {
-    "id": "exact-dom-path-from-input",
-    "description": "clear action description",
-    "x": number,
-    "y": number,
-    "elementType": "original-element-type",
-    "confidence": number between 0.7 and 1.0
-  }
-]
-
-Important rules:
-1. Return ONLY the JSON array, no other text or content
-2. Use the exact id/path from the input elements
-3. Keep the original x,y coordinates
-4. Keep the original element type
-5. Make descriptions clear and concise
-6. Assign confidence scores between 0.7 and 1.0
-7. Focus on primary navigation and important actions
-8. Include 3-5 actions in the array`
+          content: `Analyze DOM elements and suggest ALL relevant interactive elements. Return a JSON array of actions:
+[{"id": "path", "description": "clear action", "x": number, "y": number, "elementType": "type", "confidence": 0.1-1.0, "category": "navigation|content|action"}]
+Rules: Return ALL possible actions (up to 20), include descriptions (max 100 chars), use exact paths and coordinates. Include confidence scores from 0.1 to 1.0 to show relative importance.`
         },
         {
           role: "user",
-          content: JSON.stringify(importantElements)
+          content: JSON.stringify({
+            elements: importantElements,
+            context: { lastActionCategory }
+          })
         }
       ],
-      max_tokens: 1000,
-      temperature: 0
-    })
+      max_tokens: 2000,
+      temperature: 0,
+      stream: true
+    });
 
-    const suggestedActions = response.choices[0].message.content
-    console.log('GPT Response:', suggestedActions);
+    let fullResponse = '';
+    for await (const chunk of stream) {
+      fullResponse += chunk.choices[0]?.delta?.content || '';
+    }
     
     let actions: AgentAction[];
     try {
-      const parsed = JSON.parse(suggestedActions || '[]');
+      const parsed = JSON.parse(fullResponse || '[]');
       actions = Array.isArray(parsed) ? parsed : [];
     } catch (error) {
-      console.error('Error parsing GPT response:', error, 'Raw response:', suggestedActions);
+      console.error('Error parsing GPT response:', error, 'Raw response:', fullResponse);
       actions = [];
     }
 
-    // Filter out low confidence actions and ensure proper typing
+    // Return all actions without filtering by confidence
     actions = actions
-      .filter(action => action.confidence > 0.7)
+      .sort((a, b) => b.confidence - a.confidence)
       .map(action => ({
         id: action.id,
         description: action.description,
         x: action.x,
         y: action.y,
         elementType: action.elementType,
-        confidence: action.confidence
+        confidence: action.confidence,
+        category: action.category
       }));
+
+    // Cache the result
+    cache.set(cacheKey, { data: actions, timestamp: Date.now() });
 
     return new Response(
       JSON.stringify({ actions }),

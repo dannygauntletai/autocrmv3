@@ -8,6 +8,7 @@ export interface AgentAction {
   y: number;
   elementType: string;
   confidence: number;
+  category: 'navigation' | 'content' | 'action';
 }
 
 export interface AgentModeState {
@@ -47,7 +48,7 @@ export const useAgentMode = () => {
     };
   }, []);
 
-  const updateSuggestions = useCallback(async (forceActive = false) => {
+  const updateSuggestions = useCallback(async (forceActive = false, lastActionCategory?: string) => {
     console.log('updateSuggestions called, isActive:', state.isActive, 'forceActive:', forceActive);
     if (!state.isActive && !forceActive) {
       console.log('Skipping update - agent mode not active');
@@ -67,10 +68,16 @@ export const useAgentMode = () => {
 
       // Send elements to edge function for analysis
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/suggest-dom-actions`;
-      const headers = {
+      const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
       };
+
+      // Add last action category to headers if available
+      if (lastActionCategory) {
+        headers['X-Last-Action-Category'] = lastActionCategory;
+      }
+
       const body = JSON.stringify({ elements });
 
       console.log('Calling edge function with:', {
@@ -254,7 +261,7 @@ export const useAgentMode = () => {
                 // Wait a bit more for any async updates to settle
                 setTimeout(async () => {
                   console.log('Updating suggestions after DOM changes...');
-                  await updateSuggestions();
+                  await updateSuggestions(true, action.category);
                 }, 500);
               }
             });
@@ -270,7 +277,7 @@ export const useAgentMode = () => {
             // Set a maximum wait time for DOM changes
             setTimeout(() => {
               observer.disconnect();
-              updateSuggestions();
+              updateSuggestions(true, action.category);
             }, 3000);
 
           } else {

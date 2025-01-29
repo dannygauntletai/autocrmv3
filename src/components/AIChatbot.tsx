@@ -92,26 +92,44 @@ const AIChatbot = ({ onClose }: AIChatbotProps) => {
           </div>
 
           {/* Action Suggestions */}
-          <div className="fixed top-4 left-1/2 transform -translate-x-1/2 flex gap-2 z-40">
+          <div className="fixed top-4 right-4 w-64 bg-white rounded-lg shadow-lg border border-gray-200 p-2 z-40">
             {isLoading ? (
-              <div className="px-3 py-1.5 bg-white rounded-full shadow-lg border border-gray-200">
+              <div className="flex items-center justify-center p-2">
                 <Loader className="w-4 h-4 animate-spin text-blue-500" />
               </div>
             ) : error ? (
-              <div className="px-3 py-1.5 bg-white rounded-full shadow-lg border border-red-200 text-red-500 text-sm">
+              <div className="p-2 text-red-500 text-sm text-center">
                 {error}
               </div>
             ) : (
-              currentActions.map((action) => (
-                <button
-                  key={action.id}
-                  onClick={() => handleActionClick(action)}
-                  className="px-3 py-1.5 bg-white rounded-full shadow-lg border border-gray-200 text-sm hover:bg-gray-50"
-                  disabled={isAnimating || isLoading}
-                >
-                  {action.description}
-                </button>
-              ))
+              <div className="space-y-2">
+                {/* Group actions by category */}
+                {['content', 'action', 'navigation'].map(category => {
+                  const categoryActions = currentActions.filter(action => action.category === category);
+                  if (categoryActions.length === 0) return null;
+                  
+                  return (
+                    <div key={category} className="space-y-1">
+                      <div className="text-xs font-medium text-gray-500 capitalize">
+                        {category}:
+                      </div>
+                      <div className="grid grid-cols-2 gap-1">
+                        {categoryActions.map((action) => (
+                          <button
+                            key={action.id}
+                            onClick={() => handleActionClick(action)}
+                            disabled={isAnimating || isLoading}
+                            className="px-2 py-1 text-xs bg-white hover:bg-gray-50 border border-gray-200 rounded text-left truncate disabled:opacity-50"
+                            title={action.description}
+                          >
+                            {action.description}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
         </>
