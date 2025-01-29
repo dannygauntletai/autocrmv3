@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Route, Routes, Link, Navigate, useLocation } from "react-router-dom";
-import { Layout, Database, ClipboardList, FileText, InboxIcon, LayoutDashboard, MessageSquare, Users, GitBranch, Award, Scale, LogOut, FileUp, Bot } from "lucide-react";
+import { Layout, Database, ClipboardList, FileText, InboxIcon, LayoutDashboard, MessageSquare, Users, GitBranch, Award, Scale, LogOut, FileUp, Bot, Camera } from "lucide-react";
 import { SchemaDefinitionsManager } from "./SchemaDefinitionsManager";
 import { AuditLogViewer } from "./AuditLogViewer";
 import { CreateTicketForm } from "./CreateTicketForm";
@@ -17,6 +17,7 @@ import { useAuth } from './hooks/useAuth';
 import { useEmployeeRole } from './hooks/useEmployeeRole';
 import { TeamDocumentsPanel } from "./TeamDocumentsPanel";
 import { AIChatbot } from "./AIChatbot";
+import html2canvas from 'html2canvas';
 
 const NavLink = ({
   to,
@@ -47,6 +48,18 @@ export const DataManagementAdminPanel = () => {
 
   const isAdmin = role === 'admin';
   const isSupervisor = role === 'supervisor';
+
+  const captureScreenshot = async () => {
+    try {
+      const canvas = await html2canvas(document.body);
+      const link = document.createElement('a');
+      link.download = `screenshot-${new Date().toISOString()}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    } catch (error) {
+      console.error('Error capturing screenshot:', error);
+    }
+  };
 
   return (
     <div className="flex h-screen w-full bg-gray-50">
@@ -139,6 +152,13 @@ export const DataManagementAdminPanel = () => {
             )}
 
             <div className="pt-6 space-y-2 border-t border-gray-200">
+              <button
+                onClick={captureScreenshot}
+                className="flex items-center gap-2 px-3 py-2 w-full text-left rounded-md hover:bg-gray-50 text-gray-700"
+              >
+                <Camera className="h-5 w-5" />
+                Take Screenshot
+              </button>
               <button
                 onClick={() => setShowAIChat(prev => !prev)}
                 className="flex items-center gap-2 px-3 py-2 w-full text-left rounded-md hover:bg-gray-50 text-gray-700"

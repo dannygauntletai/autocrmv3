@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
-import { X, Send, Bot, Loader } from "lucide-react";
+import { X, Send, Bot, Loader, MousePointer } from "lucide-react";
 import { supabase } from './lib/supabaseClient';
 import { useAuth } from './hooks/useAuth';
 import { TicketStatus, TicketPriority } from './types/common';
 import { useNavigate } from 'react-router-dom';
+import { useAgentMode } from './hooks/useAgentMode';
 
 interface Props {
   onClose: () => void;
@@ -46,6 +47,15 @@ export const AIChatbot = ({
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const {
+    isActive: isAgentModeActive,
+    currentActions,
+    isAnimating,
+    cursorPosition,
+    startAgentMode,
+    stopAgentMode,
+    handleActionClick
+  } = useAgentMode();
 
   // Helper function to get contextual initial message
   const getInitialMessage = async (view?: Props['currentView']) => {
@@ -162,75 +172,86 @@ export const AIChatbot = ({
     try {
       let response = "";
 
-      // Send every query to the routing function
-      const { data: routeData, error: routeError } = await supabase.functions.invoke('sidebar-router', {
-        body: {
-          query: inputValue,
-          email: user?.email
-        }
-      });
+      // Handle agent mode commands
+      if (inputValue.toLowerCase() === 'start agent mode') {
+        await startAgentMode();
+        response = "Agent mode activated. I'll analyze the screen and suggest possible actions. Click on any suggested action to see me navigate to and click it.";
+      } else if (inputValue.toLowerCase() === 'stop agent mode') {
+        stopAgentMode();
+        response = "Agent mode deactivated.";
+      } else if (isAgentModeActive) {
+        response = "Agent mode is active. I can help you interact with the interface. Choose an action from the suggestions below, or type 'stop agent mode' to exit.";
+      } else {
+        // Send every query to the routing function
+        const { data: routeData, error: routeError } = await supabase.functions.invoke('sidebar-router', {
+          body: {
+            query: inputValue,
+            email: user?.email
+          }
+        });
 
-      if (routeError) throw routeError;
+        if (routeError) throw routeError;
 
-      // Handle routing response
-      if (routeData?.route) {
-        response = handleNavigation(routeData.route);
-      } else if (routeData?.message) {
-        response = routeData.message;
-      }
-      
-      // If not a routing request, handle ticket-specific commands
-      if (!response && currentView?.type === 'ticket_detail' && currentView.data?.ticketId) {
-        const ticketId = currentView.data.ticketId;
-        
-        if (!currentTicket) {
-          const ticket = await handleTicketQuery(ticketId);
-          setCurrentTicket(ticket);
+        // Handle routing response
+        if (routeData?.route) {
+          response = handleNavigation(routeData.route);
+        } else if (routeData?.message) {
+          response = routeData.message;
         }
         
-        if (inputValue.includes('status')) {
-          const status = inputValue.includes('resolved') ? 'resolved' : 
-                        inputValue.includes('pending') ? 'pending' : 'open';
-          await updateTicketStatus(ticketId, status as TicketStatus);
-          response = `Updated ticket "${currentTicket?.title}" status from ${currentTicket?.status} to ${status}`;
-          setCurrentTicket(prev => prev ? { ...prev, status } : null);
-        } 
-        else if (inputValue.includes('priority')) {
-          const priority = inputValue.includes('high') ? 'high' : 
-                          inputValue.includes('medium') ? 'medium' : 'low';
-          await updateTicketPriority(ticketId, priority as TicketPriority);
-          response = `Updated ticket "${currentTicket?.title}" priority from ${currentTicket?.priority} to ${priority}`;
-          setCurrentTicket(prev => prev ? { ...prev, priority } : null);
-        }
-        else if (inputValue.includes('respond') || inputValue.includes('reply')) {
-          const message = inputValue.includes('with') ? 
-            inputValue.split('with')[1]?.trim() : 
-            inputValue.replace(/respond|reply/i, '').trim();
+        // If not a routing request, handle ticket-specific commands
+        if (!response && currentView?.type === 'ticket_detail' && currentView.data?.ticketId) {
+          const ticketId = currentView.data.ticketId;
           
-          if (message) {
-            await addTicketMessage(ticketId, message);
-            response = `Added your response to ticket "${currentTicket?.title}"`;
+          if (!currentTicket) {
+            const ticket = await handleTicketQuery(ticketId);
+            setCurrentTicket(ticket);
+          }
+          
+          if (inputValue.includes('status')) {
+            const status = inputValue.includes('resolved') ? 'resolved' : 
+                          inputValue.includes('pending') ? 'pending' : 'open';
+            await updateTicketStatus(ticketId, status as TicketStatus);
+            response = `Updated ticket "${currentTicket?.title}" status from ${currentTicket?.status} to ${status}`;
+            setCurrentTicket(prev => prev ? { ...prev, status } : null);
+          } 
+          else if (inputValue.includes('priority')) {
+            const priority = inputValue.includes('high') ? 'high' : 
+                            inputValue.includes('medium') ? 'medium' : 'low';
+            await updateTicketPriority(ticketId, priority as TicketPriority);
+            response = `Updated ticket "${currentTicket?.title}" priority from ${currentTicket?.priority} to ${priority}`;
+            setCurrentTicket(prev => prev ? { ...prev, priority } : null);
+          }
+          else if (inputValue.includes('respond') || inputValue.includes('reply')) {
+            const message = inputValue.includes('with') ? 
+              inputValue.split('with')[1]?.trim() : 
+              inputValue.replace(/respond|reply/i, '').trim();
+            
+            if (message) {
+              await addTicketMessage(ticketId, message);
+              response = `Added your response to ticket "${currentTicket?.title}"`;
+            }
+          }
+          else if (inputValue.includes('summary') || inputValue.includes('details')) {
+            response = currentTicket ? 
+              `Ticket: "${currentTicket.title}"\nStatus: ${currentTicket.status}\nPriority: ${currentTicket.priority}\nMessages: ${currentTicket.ticket_messages?.length || 0}` :
+              "Sorry, I couldn't fetch the ticket details.";
           }
         }
-        else if (inputValue.includes('summary') || inputValue.includes('details')) {
-          response = currentTicket ? 
-            `Ticket: "${currentTicket.title}"\nStatus: ${currentTicket.status}\nPriority: ${currentTicket.priority}\nMessages: ${currentTicket.ticket_messages?.length || 0}` :
-            "Sorry, I couldn't fetch the ticket details.";
+        
+        // Default help response
+        if (!response) {
+          response = currentView?.type === 'ticket_detail' 
+            ? "I can help you with:\n" +
+              "- Update status (e.g., 'set status to resolved')\n" +
+              "- Update priority (e.g., 'set priority to high')\n" +
+              "- Respond (e.g., 'respond with [your message]')\n" +
+              "- View summary (e.g., 'show ticket summary')"
+            : "I can help you with:\n" +
+              "- Navigation (just tell me where you want to go)\n" +
+              "- View specific tickets\n" +
+              "- Manage tickets when viewing them";
         }
-      }
-      
-      // Default help response
-      if (!response) {
-        response = currentView?.type === 'ticket_detail' 
-          ? "I can help you with:\n" +
-            "- Update status (e.g., 'set status to resolved')\n" +
-            "- Update priority (e.g., 'set priority to high')\n" +
-            "- Respond (e.g., 'respond with [your message]')\n" +
-            "- View summary (e.g., 'show ticket summary')"
-          : "I can help you with:\n" +
-            "- Navigation (just tell me where you want to go)\n" +
-            "- View specific tickets\n" +
-            "- Manage tickets when viewing them";
       }
 
       const botMessage = {
@@ -271,66 +292,118 @@ export const AIChatbot = ({
 
   const quickActions = getQuickActions();
 
-  return (
-    <div className="fixed bottom-6 right-6 w-96 h-[600px] bg-white rounded-lg shadow-xl flex flex-col border border-gray-200 z-50">
-      <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-blue-600 text-white rounded-t-lg">
-        <div className="flex items-center gap-2">
-          <Bot className="h-5 w-5" />
-          <h3 className="font-medium">AI Assistant</h3>
-        </div>
-        <button onClick={onClose} className="text-white hover:text-gray-200">
-          <X className="h-5 w-5" />
-        </button>
+  // Render agent mode cursor
+  const renderCursor = () => {
+    if (!isAgentModeActive || !cursorPosition) return null;
+
+    return (
+      <div
+        className="fixed pointer-events-none z-50"
+        style={{
+          left: cursorPosition.x,
+          top: cursorPosition.y,
+          transform: 'translate(-50%, -50%)'
+        }}
+      >
+        <MousePointer
+          className={`h-6 w-6 text-blue-600 ${isAnimating ? 'animate-pulse' : ''}`}
+        />
       </div>
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map(message => (
-          <div key={message.id} className={`flex ${message.type === "user" ? "justify-end" : "justify-start"}`}>
-            <div className={`max-w-[80%] rounded-lg p-3 ${message.type === "user" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-900"}`}>
-              <p className="text-sm whitespace-pre-line">{message.content}</p>
-              <span className="text-xs mt-1 block opacity-70">
-                {new Date(message.timestamp).toLocaleTimeString()}
+    );
+  };
+
+  // Render agent mode action buttons
+  const renderAgentActions = () => {
+    if (!isAgentModeActive || currentActions.length === 0) return null;
+
+    return (
+      <div className="mt-4 space-y-2">
+        <div className="text-sm font-medium text-gray-700 mb-2">
+          Suggested Actions:
+        </div>
+        {currentActions.map((action) => (
+          <button
+            key={action.id}
+            onClick={() => handleActionClick(action)}
+            disabled={isAnimating}
+            className="w-full text-left p-2 hover:bg-gray-50 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <div className="flex justify-between items-center">
+              <span>{action.description}</span>
+              <span className="text-sm text-gray-500">
+                {Math.round(action.confidence * 100)}% confidence
               </span>
             </div>
-          </div>
+          </button>
         ))}
-        {isLoading && (
-          <div className="flex justify-start">
-            <div className="bg-gray-100 rounded-lg p-3">
-              <Loader className="h-5 w-5 animate-spin text-blue-600" />
-            </div>
-          </div>
-        )}
       </div>
-      <div className="p-4 border-t border-gray-200">
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={inputValue}
-            onChange={e => setInputValue(e.target.value)}
-            onKeyPress={e => e.key === "Enter" && handleSend()}
-            placeholder="Type your message..."
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500"
-          />
-          <button
-            onClick={handleSend}
-            disabled={!inputValue.trim() || isLoading}
-            className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Send className="h-5 w-5" />
+    );
+  };
+
+  return (
+    <>
+      {renderCursor()}
+      <div className="fixed bottom-6 right-6 w-96 h-[600px] bg-white rounded-lg shadow-xl flex flex-col border border-gray-200 z-40">
+        <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-blue-600 text-white rounded-t-lg">
+          <div className="flex items-center gap-2">
+            <Bot className="h-5 w-5" />
+            <h3 className="font-medium">AI Assistant</h3>
+          </div>
+          <button onClick={onClose} className="text-white hover:text-gray-200">
+            <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="mt-2 flex gap-2">
-          {quickActions.map((action, index) => (
-            <button
-              key={index}
-              onClick={action.action}
-              className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full hover:bg-gray-200"
-            >
-              {action.label}
-            </button>
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {messages.map(message => (
+            <div key={message.id} className={`flex ${message.type === "user" ? "justify-end" : "justify-start"}`}>
+              <div className={`max-w-[80%] rounded-lg p-3 ${message.type === "user" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-900"}`}>
+                <p className="text-sm whitespace-pre-line">{message.content}</p>
+                <span className="text-xs mt-1 block opacity-70">
+                  {new Date(message.timestamp).toLocaleTimeString()}
+                </span>
+              </div>
+            </div>
           ))}
+          {isLoading && (
+            <div className="flex justify-start">
+              <div className="bg-gray-100 rounded-lg p-3">
+                <Loader className="h-5 w-5 animate-spin text-blue-600" />
+              </div>
+            </div>
+          )}
+          {renderAgentActions()}
+        </div>
+        <div className="p-4 border-t border-gray-200">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={inputValue}
+              onChange={e => setInputValue(e.target.value)}
+              onKeyPress={e => e.key === "Enter" && handleSend()}
+              placeholder="Type your message..."
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500"
+            />
+            <button
+              onClick={handleSend}
+              disabled={!inputValue.trim() || isLoading}
+              className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Send className="h-5 w-5" />
+            </button>
+          </div>
+          <div className="mt-2 flex gap-2">
+            {quickActions.map((action, index) => (
+              <button
+                key={index}
+                onClick={action.action}
+                className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full hover:bg-gray-200"
+              >
+                {action.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };

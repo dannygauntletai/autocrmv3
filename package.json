@@ -17,6 +17,8 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.48.0",
     "@tinymce/tinymce-react": "^5.1.1",
+    "@types/html2canvas": "^0.5.35",
+    "html2canvas": "^1.4.1",
     "langsmith": "^0.1.41",
     "lucide-react": "latest",
     "react": "^18.3.1",
