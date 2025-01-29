@@ -1,9 +1,128 @@
-# Codebase Overview
+Type the project name at the start of every composer message.
 
-This codebase appears to be part of a web application built using TypeScript, React. The application integrates with Supabase for backend services, including authentication and database interactions.
+# Project Name: AutoCRM
+Every time you choose to apply a rule(s), explicitly state the rule(s) in the output. You can abbreviate the rule description to a single word or phrase.
 
-# Stack and Key Technologies
-Frontend Framework: React, TypeScript: Used for type-safe code across the frontend.
-Supabase: An open-source Firebase alternative used for backend services like authentication, database, and storage.
+## Project Context
+AutoCRM is an AI-powered Customer Relationship Management system designed to minimize manual support workload while enhancing customer experience. The system leverages generative AI to provide interactive support and sales experiences, integrating existing help resources with Large Language Models (LLMs).
 
-don't run supabase secrets set terminal commands
+## Code Style and Structure
+- Write concise, technical TypeScript code with accurate examples
+- Use functional and declarative programming patterns; avoid classes
+- Prefer iteration and modularization over code duplication
+- Use descriptive variable names with auxiliary verbs (e.g., isLoading, hasError)
+- Structure repository files as follows:
+```
+src/
+├── ui/                          # Frontend React components
+│   ├── components/              # Reusable UI components
+│   ├── features/               # Feature-specific components
+│   ├── hooks/                  # UI-specific hooks
+│   └── layouts/               # Layout components
+
+├── api/                       # API route handlers
+│   ├── routes/               # API endpoints
+│   ├── middleware/           # Request/response middleware
+│   └── errors/              # API error handling
+
+├── lib/                      # Business logic & utilities
+│   ├── services/            # Core business logic
+│   ├── store/              # Global state management (Zustand)
+│   ├── supabase/           # Database access
+│   │   └── queries/        # Database queries
+│   ├── types/              # Business/Domain specific types
+│   │   ├── domain/        # Domain models
+│   │   └── api/          # API request/response types
+│   └── validation/        # Business validation rules
+
+├── database/              # Database schema & migrations
+│   ├── migrations/       # Database migrations
+│   ├── seeds/           # Seed data
+│   └── schema/          # Database schema definitions
+
+└── shared/              # Cross-layer shared code
+   ├── constants/       # Shared constants & config
+   ├── types/          # Shared type definitions
+   └── utils/          # Shared utilities
+```
+
+## Tech Stack
+- React/TypeScript: Used for type-safe code across the frontend.
+- Supabase: An open-source Firebase alternative used for backend services like authentication, database, and storage.
+
+## Naming Conventions
+- Use lowercase with dashes for directories (e.g., components/form-wizard)
+- Favor named exports for components and utilities
+- Use PascalCase for component files (e.g., VisaForm.tsx)
+- Use camelCase for utility files (e.g., formValidator.ts)
+
+## TypeScript Usage
+- Use TypeScript for all code; prefer interfaces over types
+- Avoid enums; use const objects with 'as const' assertion
+- Use functional components with TypeScript interfaces
+- Define strict types for message passing between different parts of the extension
+- Use absolute imports for all files @/...
+- Avoid try/catch blocks unless there's good reason to translate or handle error in that abstraction
+- Use explicit return types for all functions
+
+## State Management
+- Use React Context for global state when needed
+- Implement proper cleanup in useEffect hooks
+- Use Zustand for global state management
+
+## Syntax and Formatting
+- Use "function" keyword for pure functions
+- Avoid unnecessary curly braces in conditionals
+- Use declarative JSX
+- Implement proper TypeScript discriminated unions for message types
+
+## UI and Styling
+- Consider extension-specific constraints (popup dimensions, permissions)
+
+## Error Handling
+- Implement proper error boundaries
+- Log errors appropriately for debugging
+- Provide user-friendly error messages
+- Handle network failures gracefully
+
+## Testing
+- Implement E2E tests for critical flows using Playwright (request the Playwright Notepad before writing tests)
+
+## Security
+- Implement Content Security Policy
+- Sanitize user inputs
+- Handle sensitive data properly
+- Follow Chrome extension security best practices
+- Implement proper CORS handling
+
+## Git Usage
+Commit Message Prefixes:
+- "fix:" for bug fixes
+- "feat:" for new features
+- "perf:" for performance improvements
+- "docs:" for documentation changes
+- "style:" for formatting changes
+- "refactor:" for code refactoring
+- "test:" for adding missing tests
+- "chore:" for maintenance tasks
+
+Rules:
+- Use lowercase for commit messages
+- Keep the summary line concise
+- Include description for non-obvious changes
+- Reference issue numbers when applicable
+- Avoid running any supabase terminal commands that is not related to edge functions
+
+## Documentation
+- Maintain clear README with setup instructions
+- Document API interactions and data flows
+- Keep manifest.json well-documented
+- Don't include comments unless it's for complex logic
+- Document permission requirements
+
+## Development Workflow
+- Use proper version control
+- Implement proper code review process
+- Test in multiple environments
+- Follow semantic versioning for releases
+- Maintain changelog
