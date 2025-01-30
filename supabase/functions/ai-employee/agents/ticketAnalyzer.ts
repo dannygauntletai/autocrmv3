@@ -16,6 +16,7 @@ export interface TicketAnalyzerConfig extends BaseToolConfig {
   openAiKey: string;
   model?: string;
   temperature?: number;
+  langSmithProjectName?: string;
 }
 
 interface AnalyzerResult {
@@ -100,8 +101,27 @@ export class TicketAnalyzer {
       const executor = await initializeAgentExecutorWithOptions(this.tools, this.model, {
         agentType: "openai-functions",
         verbose: true,
-        maxIterations: 5, // Increased to allow for more complex workflows
+        maxIterations: 5,
         returnIntermediateSteps: true,
+        // Add tracing configuration
+        callbacks: [{
+          handleLLMStart: async (llm: any, prompts: string[]) => {
+            console.log("[LangSmith] LLM Start:", { 
+              model: llm.modelName,
+              temperature: llm.temperature,
+              ticketId: this.config.ticketId,
+              projectName: this.config.langSmithProjectName || "autocrm-yolo"
+            });
+          },
+          handleToolStart: async (tool: any, input: string) => {
+            console.log("[LangSmith] Tool Start:", {
+              tool: tool.name,
+              input,
+              ticketId: this.config.ticketId,
+              projectName: this.config.langSmithProjectName || "autocrm-yolo"
+            });
+          }
+        }]
       });
 
       // Let the AI analyze and decide actions
