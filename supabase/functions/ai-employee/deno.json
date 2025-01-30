@@ -1,0 +1,20 @@
+{
+  "imports": {
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2",
+    "@langchain/openai": "npm:@langchain/openai@0.4.2",
+    "@langchain/core": "npm:@langchain/core@0.3.29",
+    "@langchain/core/agents": "npm:@langchain/core@0.3.29/agents",
+    "@langchain/core/prompts": "npm:@langchain/core@0.3.29/prompts",
+    "@langchain/core/runnables": "npm:@langchain/core@0.3.29/runnables",
+    "@langchain/core/messages": "npm:@langchain/core@0.3.29/messages",
+    "@langchain/core/tools": "npm:@langchain/core@0.3.29/tools",
+    "@langchain/core/executors": "npm:@langchain/core@0.3.29/executors",
+    "@langchain/openai/agents": "npm:@langchain/openai@0.4.2/agents",
+    "@langchain/community": "npm:@langchain/community@0.0.27",
+    "zod": "npm:zod@3.22.4"
+  },
+  "tasks": {
+    "start": "deno run --allow-net --allow-env --allow-read index.ts",
+    "deploy": "supabase functions deploy ai-employee"
+  }
+} 
