@@ -15,6 +15,9 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@langchain/community": "^0.0.27",
+    "@langchain/core": "^0.3.29",
+    "@langchain/openai": "^0.4.2",
     "@supabase/supabase-js": "^2.48.0",
     "@tinymce/tinymce-react": "^5.1.1",
     "@types/html2canvas": "^0.5.35",
