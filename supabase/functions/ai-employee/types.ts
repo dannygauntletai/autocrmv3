@@ -1,5 +1,5 @@
-import { BaseMessage } from "@langchain/core/messages";
-import { Tool } from "@langchain/core/tools";
+import { BaseMessage } from 'langchain/schema';
+import { Tool } from 'langchain/tools';
 
 export interface TicketTool extends Tool {
   ticketId: string;

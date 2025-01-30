@@ -1,16 +1,12 @@
 {
   "imports": {
-    "@supabase/supabase-js": "npm:@supabase/supabase-js@2",
-    "@langchain/openai": "npm:@langchain/openai@0.4.2",
-    "@langchain/core": "npm:@langchain/core@0.3.29",
-    "@langchain/core/agents": "npm:@langchain/core@0.3.29/agents",
-    "@langchain/core/prompts": "npm:@langchain/core@0.3.29/prompts",
-    "@langchain/core/runnables": "npm:@langchain/core@0.3.29/runnables",
-    "@langchain/core/messages": "npm:@langchain/core@0.3.29/messages",
-    "@langchain/core/tools": "npm:@langchain/core@0.3.29/tools",
-    "@langchain/core/executors": "npm:@langchain/core@0.3.29/executors",
-    "@langchain/openai/agents": "npm:@langchain/openai@0.4.2/agents",
-    "@langchain/community": "npm:@langchain/community@0.0.27",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.38.4",
+    "langchain/chat_models/openai": "npm:langchain@0.0.147/chat_models/openai",
+    "langchain/agents": "npm:langchain@0.0.147/agents",
+    "langchain/schema/runnable": "npm:langchain@0.0.147/schema/runnable",
+    "langchain/schema": "npm:langchain@0.0.147/schema",
+    "langchain/prompts": "npm:langchain@0.0.147/prompts",
+    "langchain/tools": "npm:langchain@0.0.147/tools",
     "zod": "npm:zod@3.22.4"
   },
   "tasks": {

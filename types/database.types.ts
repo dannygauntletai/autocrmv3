@@ -516,16 +516,7 @@ export type Database = {
         Args: {
           search_query: string
         }
-        Returns: {
-          category_id: string | null
-          content: string
-          created_at: string
-          created_by: string
-          id: string
-          tags: string[] | null
-          ticket_id: string | null
-          title: string
-        }[]
+        Returns: Array<Database['public']['Tables']['kb_articles']['Row']>
       }
     }
     Enums: {

@@ -1,7 +1,7 @@
-import { Tool } from "@langchain/core/tools";
-import { createClient } from "@supabase/supabase-js";
-import { ToolResult } from "../types.ts";
-import { BaseMessage } from "@langchain/core/messages";
+import { Tool } from 'langchain/tools';
+import { createClient } from '@supabase/supabase-js';
+import { ToolResult } from '../types.ts';
+import { BaseMessage } from 'langchain/schema';
 
 export class MemoryManagementTool extends Tool {
   name = "memory_management";

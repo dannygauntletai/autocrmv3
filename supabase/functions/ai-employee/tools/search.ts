@@ -1,14 +1,13 @@
-import { Tool } from "@langchain/core/tools";
-import { createClient } from "@supabase/supabase-js";
-import { ToolResult } from "../types.ts";
+import { Tool } from 'langchain/tools';
+import { createClient } from '@supabase/supabase-js';
+import { ToolResult } from '../types.ts';
 import type { Database } from "../../../../types/database.types.ts";
 
-type KBArticle = Database['public']['Tables']['kb_articles']['Row'];
 type TicketMessage = Database['public']['Tables']['ticket_messages']['Row'];
 
 export class SearchTool extends Tool {
   name = "search";
-  description = "Search through knowledge base articles, ticket history, and file embeddings. Input should be a JSON string with 'type' ('rag', 'similarity', or 'keyword'), 'query', and optional 'filters' like category or date range.";
+  description = "Search through ticket history and messages. Input should be a JSON string with 'query' and optional 'filters' like date range.";
   
   private supabase;
   private supabaseUrl: string;
@@ -22,15 +21,20 @@ export class SearchTool extends Tool {
     this.supabaseUrl = supabaseUrl;
     this.supabaseKey = supabaseKey;
     this.supabase = createClient<Database>(supabaseUrl, supabaseKey);
+    console.log("[SearchTool] Initialized with URL:", this.supabaseUrl);
   }
 
   /** @ignore */
   async _call(input: string): Promise<string> {
     try {
+      console.log("[SearchTool] Received input:", input);
       const parsed = JSON.parse(input);
-      const result = await this.executeSearch(parsed);
+      console.log("[SearchTool] Parsed input:", parsed);
+      const result = await this.searchMessages(parsed.query, parsed.filters);
+      console.log("[SearchTool] Search result:", result);
       return JSON.stringify(result);
     } catch (error) {
+      console.error("[SearchTool] Error in _call:", error);
       if (error instanceof Error) {
         return JSON.stringify({
           success: false,
@@ -44,43 +48,26 @@ export class SearchTool extends Tool {
     }
   }
 
-  private async executeSearch(args: {
-    type: 'rag' | 'similarity' | 'keyword',
-    query: string,
-    filters?: {
-      category?: string;
-      dateRange?: { start: string; end: string };
-      tags?: string[];
-    }
-  }): Promise<ToolResult> {
-    switch (args.type) {
-      case 'rag':
-        return await this.performRAGSearch(args.query, args.filters);
-      case 'similarity':
-        return await this.performSimilaritySearch(args.query, args.filters);
-      case 'keyword':
-        return await this.performKeywordSearch(args.query, args.filters);
-      default:
-        throw new Error(`Unknown search type: ${args.type}`);
-    }
+  private isTicketMessage(message: unknown): message is TicketMessage {
+    const isValid = (
+      message !== null &&
+      typeof message === 'object' &&
+      'id' in message &&
+      'message_body' in message &&
+      'created_at' in message &&
+      'ticket_id' in message
+    );
+    console.log("[SearchTool] Message validation result:", { message, isValid });
+    return isValid;
   }
 
-  private async performRAGSearch(
-    query: string, 
+  private async searchMessages(
+    query: string,
     filters?: {
-      category?: string;
       dateRange?: { start: string; end: string };
-      tags?: string[];
     }
   ): Promise<ToolResult> {
-    const queryEmbedding = await this.getEmbedding(query);
-
-    const { data: articles, error: articleError } = await this.supabase
-      .rpc('search_kb_articles', {
-        search_query: query
-      });
-
-    if (articleError) throw articleError;
+    console.log("[SearchTool] Starting message search with:", { query, filters });
 
     const { data: messages, error: messageError } = await this.supabase
       .from('ticket_messages')
@@ -105,179 +92,67 @@ export class SearchTool extends Tool {
       .order('created_at', { ascending: false })
       .limit(5);
 
-    if (messageError) throw messageError;
-
-    let filteredArticles = articles as KBArticle[];
-    if (filters) {
-      if (filters.category) {
-        filteredArticles = filteredArticles.filter((article: KBArticle) => 
-          article.category_id === filters.category
-        );
-      }
-      if (filters.tags) {
-        filteredArticles = filteredArticles.filter((article: KBArticle) => 
-          article.tags?.some((tag: string) => filters.tags?.includes(tag))
-        );
-      }
-      if (filters.dateRange) {
-        filteredArticles = filteredArticles.filter((article: KBArticle) => 
-          article.created_at >= filters.dateRange!.start && 
-          article.created_at <= filters.dateRange!.end
-        );
-      }
+    if (messageError) {
+      console.error("[SearchTool] Database error:", messageError);
+      throw messageError;
     }
 
-    const { data: fileEmbeddings, error: fileError } = await (this.supabase as any)
-      .from('file_embeddings')
-      .select('*')
-      .limit(3);
+    console.log("[SearchTool] Raw messages from DB:", messages);
 
-    if (fileError) throw fileError;
-
-    const typedMessages = messages as unknown as TicketMessage[];
-
-    return {
-      success: true,
-      data: {
-        knowledgeBase: filteredArticles,
-        relevantMessages: typedMessages,
-        relatedFiles: fileEmbeddings
-      },
-      context: {
-        ticketId: 'global',
-        userId: 'system',
-        timestamp: Date.now(),
-        metadata: {
-          searchType: 'rag',
-          articlesFound: filteredArticles.length,
-          messagesFound: messages?.length ?? 0,
-          filesFound: fileEmbeddings?.length ?? 0,
-          filters: filters ?? 'none'
+    if (!messages || !Array.isArray(messages)) {
+      console.log("[SearchTool] No messages found or invalid response");
+      return {
+        success: true,
+        data: [],
+        context: {
+          ticketId: 'global',
+          userId: 'system',
+          timestamp: Date.now(),
+          metadata: {
+            searchType: 'message',
+            messagesFound: 0,
+            filters: filters ?? 'none'
+          }
         }
-      }
-    };
-  }
-
-  private async performSimilaritySearch(
-    query: string, 
-    filters?: {
-      category?: string;
-      dateRange?: { start: string; end: string };
-      tags?: string[];
+      };
     }
-  ): Promise<ToolResult> {
-    const queryEmbedding = await this.getEmbedding(query);
 
-    const { data: articles, error: articleError } = await this.supabase
-      .rpc('search_kb_articles', {
-        search_query: query
+    // Filter valid messages
+    const validMessages = messages.filter(this.isTicketMessage);
+    console.log("[SearchTool] Valid messages after type check:", validMessages.length);
+
+    let filteredMessages = validMessages;
+    if (filters?.dateRange) {
+      console.log("[SearchTool] Applying date range filter:", filters.dateRange);
+      filteredMessages = filteredMessages.filter(message => {
+        const isInRange = message.created_at && 
+          message.created_at >= filters.dateRange!.start && 
+          message.created_at <= filters.dateRange!.end;
+        console.log("[SearchTool] Message date check:", { 
+          messageId: message.id, 
+          date: message.created_at, 
+          isInRange 
+        });
+        return isInRange;
       });
-
-    if (articleError) throw articleError;
-
-    let filteredArticles = articles as KBArticle[];
-    if (filters) {
-      if (filters.category) {
-        filteredArticles = filteredArticles.filter((article: KBArticle) => 
-          article.category_id === filters.category
-        );
-      }
-      if (filters.tags) {
-        filteredArticles = filteredArticles.filter((article: KBArticle) => 
-          article.tags?.some((tag: string) => filters.tags?.includes(tag))
-        );
-      }
     }
 
-    return {
+    const result = {
       success: true,
-      data: filteredArticles,
+      data: filteredMessages,
       context: {
         ticketId: 'global',
         userId: 'system',
         timestamp: Date.now(),
         metadata: {
-          searchType: 'similarity',
-          documentsFound: filteredArticles.length,
+          searchType: 'message',
+          messagesFound: filteredMessages.length,
           filters: filters ?? 'none'
         }
       }
     };
-  }
 
-  private async performKeywordSearch(
-    query: string, 
-    filters?: {
-      category?: string;
-      dateRange?: { start: string; end: string };
-      tags?: string[];
-    }
-  ): Promise<ToolResult> {
-    const { data: articles, error: articleError } = await this.supabase
-      .from('kb_articles')
-      .select(`
-        *,
-        category:category_id (
-          name
-        )
-      `)
-      .textSearch('title || content', query)
-      .limit(10);
-
-    if (articleError) throw articleError;
-
-    let filteredArticles = articles as KBArticle[];
-    if (filters) {
-      if (filters.category) {
-        filteredArticles = filteredArticles.filter((article: KBArticle) => 
-          article.category_id === filters.category
-        );
-      }
-      if (filters.tags) {
-        filteredArticles = filteredArticles.filter((article: KBArticle) => 
-          article.tags?.some((tag: string) => filters.tags?.includes(tag))
-        );
-      }
-      if (filters.dateRange) {
-        filteredArticles = filteredArticles.filter((article: KBArticle) => 
-          article.created_at >= filters.dateRange!.start && 
-          article.created_at <= filters.dateRange!.end
-        );
-      }
-    }
-
-    return {
-      success: true,
-      data: filteredArticles,
-      context: {
-        ticketId: 'global',
-        userId: 'system',
-        timestamp: Date.now(),
-        metadata: {
-          searchType: 'keyword',
-          documentsFound: filteredArticles.length,
-          filters: filters ?? 'none'
-        }
-      }
-    };
-  }
-
-  private async getEmbedding(text: string): Promise<number[]> {
-    // Call the embedding generation edge function
-    const response = await fetch(`${this.supabaseUrl}/functions/v1/create-embeddings`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.supabaseKey}`
-      },
-      body: JSON.stringify({ text })
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to generate embedding');
-    }
-
-    const { embedding } = await response.json();
-    return embedding;
+    console.log("[SearchTool] Final result:", result);
+    return result;
   }
 } 
