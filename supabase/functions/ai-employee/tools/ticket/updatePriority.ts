@@ -15,7 +15,16 @@ export class UpdateTicketPriorityTool extends Tool {
   /** @ignore */
   async _call(input: string): Promise<string> {
     try {
-      const priority = input.trim().toLowerCase() as TicketPriority;
+      // Parse the input as JSON if it's a JSON string
+      let priority: string;
+      try {
+        const parsed = JSON.parse(input);
+        priority = parsed.priority;
+      } catch {
+        // If not JSON, use the raw input
+        priority = input.trim().toLowerCase();
+      }
+
       const result = await this.updatePriority(priority);
       return JSON.stringify(result);
     } catch (error) {

@@ -182,21 +182,18 @@ export class TicketAnalyzer {
   }
 
   private async readTicket() {
-    const executor = await initializeAgentExecutorWithOptions(
-      [this.tools[0]], // Only use ReadTicketTool
-      this.model,
-      {
-        agentType: "openai-functions",
-        verbose: true,
-        maxIterations: 1
+    try {
+      // Use ReadTicketTool directly
+      const readTicketTool = this.tools.find(tool => tool.name === "read_ticket") as ReadTicketTool;
+      if (!readTicketTool) {
+        throw new Error("ReadTicketTool not found in tools array");
       }
-    );
-
-    const result = await executor.call({ 
-      input: `Read all information about ticket ${this.config.ticketId}`
-    });
-
-    return JSON.parse(result.output);
+      const result = await readTicketTool._call('');
+      return JSON.parse(result);
+    } catch (error) {
+      console.error("[TicketAnalyzer] Error reading ticket:", error);
+      throw new Error(`Failed to read ticket: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   private async updateTicket(params: Record<string, any>) {

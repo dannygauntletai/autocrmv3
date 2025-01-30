@@ -64,6 +64,16 @@ serve(async (req) => {
       }
     )
 
+    // Get current ticket status
+    const { data: currentTicket, error: fetchError } = await supabaseClient
+      .from('tickets')
+      .select('priority')
+      .eq('id', ticketId)
+      .single()
+
+    if (fetchError) throw fetchError
+    if (!currentTicket) throw new Error('Ticket not found')
+
     // Update ticket priority
     const { data: ticket, error: updateError } = await supabaseClient
       .from('tickets')
@@ -82,14 +92,13 @@ serve(async (req) => {
       .from('ticket_history')
       .insert({
         ticket_id: ticketId,
-        action: 'update_priority',
         changed_by: 'system',  // Since this is a system operation
         changes: {
           priority: {
-            old: ticket.priority,
+            old: currentTicket.priority,
             new: priority
           },
-          reason
+          reason: reason || 'AI Employee update'
         },
         created_at: new Date().toISOString()
       })
