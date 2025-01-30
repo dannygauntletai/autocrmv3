@@ -7,7 +7,8 @@ import {
   ReadTicketTool, 
   UpdateTicketStatusTool, 
   UpdateTicketPriorityTool,
-  AssignTicketTool 
+  AssignTicketTool,
+  AddInternalNoteTool 
 } from "../tools/ticket/index.ts";
 import { createClient } from "@supabase/supabase-js";
 
@@ -48,7 +49,8 @@ export class TicketAnalyzer {
       new ReadTicketTool(config),
       new UpdateTicketStatusTool(config),
       new UpdateTicketPriorityTool(config),
-      new AssignTicketTool(config)
+      new AssignTicketTool(config),
+      new AddInternalNoteTool(config)
     ];
 
     // Initialize model with high temperature for creative decisions
@@ -98,31 +100,49 @@ export class TicketAnalyzer {
       const executor = await initializeAgentExecutorWithOptions(this.tools, this.model, {
         agentType: "openai-functions",
         verbose: true,
-        maxIterations: 3,
+        maxIterations: 5, // Increased to allow for more complex workflows
         returnIntermediateSteps: true,
       });
 
       // Let the AI analyze and decide actions
       const analysisResult = await executor.call({
         input: `You are in YOLO mode - full autonomous control over ticket ${this.config.ticketId}.
-               Analyze the ticket and take ANY actions you deem appropriate.
-               You have complete freedom to:
-               1. Update status
-               2. Update priority
-               3. Assign to employees
-               4. Send messages
+               Your goal is to make meaningful progress towards resolving this ticket.
+               
+               Available actions:
+               1. Update status - Use when ticket state changes
+               2. Update priority - Adjust based on urgency and impact
+               3. Assign to employees - Match skills and workload
+               4. Add internal notes - Document your analysis and decisions
+               5. Send customer messages - Communicate updates or request info
+
+               Analysis steps:
+               1. Review ticket details and history thoroughly
+               2. Assess current status and priority
+               3. Evaluate if the ticket needs assignment/reassignment
+               4. Document your analysis with internal notes
+               5. Take appropriate actions based on analysis
+               6. Update stakeholders as needed
+
+               When adding internal notes:
+               - Document your reasoning for changes
+               - Note important observations
+               - Highlight next steps or blockers
+               - Add context for other employees
+
+               When choosing employees, consider:
+               - Current workload (assigned_tickets_count)
+               - Performance metrics (avg_response_time, resolution_time)
+               - Skills and proficiency levels
+               - Role and expertise
 
                Available employees and their metrics:
                ${JSON.stringify(employeesWithSkills, null, 2)}
 
-               When choosing an employee, consider:
-               - Their current workload (assigned_tickets_count)
-               - Their performance metrics (avg_response_time, resolution_time)
-               - Their skills and proficiency levels
-               - Their role and expertise
-
-               Be creative but professional in your approach.
-               Consider employee workload and expertise when making assignments.
+               Be proactive and thorough in your approach.
+               Make decisions that move the ticket towards resolution.
+               Document your thought process with internal notes.
+               
                Current ticket data: ${JSON.stringify(ticketData.data)}`
       });
 
