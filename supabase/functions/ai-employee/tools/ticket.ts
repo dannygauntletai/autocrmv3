@@ -3,6 +3,29 @@ import { createClient } from '@supabase/supabase-js';
 import { ToolResult } from '../types.ts';
 import { z } from "zod";
 
+interface TicketMessage {
+  id: string;
+  message_body: string;
+  sender_type: string;
+  created_at: string;
+  metadata?: Record<string, any>;
+}
+
+interface TicketComment {
+  id: string;
+  content: string;
+  created_at: string;
+  created_by: string;
+}
+
+interface TicketHistory {
+  id: string;
+  ticket_id: string;
+  action: string;
+  changes: Record<string, any>;
+  created_at: string;
+}
+
 export class TicketManagementTool extends Tool {
   name = "ticket_management";
   description = "Manage ticket operations including reading details, updating status/priority, and adding comments. Input should be a JSON string with 'action' ('read', 'update', or 'comment') and optional 'params'.";
@@ -55,54 +78,159 @@ export class TicketManagementTool extends Tool {
   }
 
   private async readTicket(): Promise<ToolResult> {
-    const { data, error } = await this.supabase
+    // Get ticket with related data
+    const { data: ticket, error: ticketError } = await this.supabase
       .from('tickets')
       .select(`
         *,
-        customer:customer_id(*),
-        assignee:assignee_id(*),
-        messages(*)
+        employee_ticket_assignments!left(
+          employee:employees(*)
+        ),
+        ticket_messages(
+          id,
+          message_body,
+          sender_type,
+          created_at,
+          metadata
+        ),
+        ticket_comments(
+          id,
+          content,
+          created_at,
+          created_by
+        )
       `)
       .eq('id', this.ticketId)
+      .is('employee_ticket_assignments.unassigned_at', null)
       .single();
 
-    if (error) throw error;
+    if (ticketError) throw ticketError;
+
+    // Get ticket history
+    const { data: history, error: historyError } = await this.supabase
+      .from('ticket_history')
+      .select('id, ticket_id, changed_by, changes, created_at')
+      .eq('ticket_id', this.ticketId)
+      .order('created_at', { ascending: true });
+
+    if (historyError) throw historyError;
+
+    // Format messages chronologically
+    const messages = ticket.ticket_messages || [];
+    const comments = ticket.ticket_comments || [];
+    const timeline = [
+      ...messages.map((m: TicketMessage) => ({
+        type: 'message',
+        ...m,
+        timestamp: m.created_at
+      })),
+      ...comments.map((c: TicketComment) => ({
+        type: 'comment',
+        ...c,
+        timestamp: c.created_at
+      })),
+      ...history.map((h: TicketHistory) => ({
+        type: 'history',
+        ...h,
+        timestamp: h.created_at
+      }))
+    ].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
     return {
       success: true,
-      data,
+      data: {
+        ticket: {
+          id: ticket.id,
+          title: ticket.title,
+          description: ticket.description,
+          status: ticket.status,
+          priority: ticket.priority,
+          created_at: ticket.created_at,
+          updated_at: ticket.updated_at,
+          email: ticket.email,
+          assignee: ticket.employee_ticket_assignments?.[0]?.employee || null,
+          tags: ticket.tags
+        },
+        timeline,
+        stats: {
+          messageCount: messages.length,
+          commentCount: comments.length,
+          historyCount: history.length,
+          lastActivity: timeline[timeline.length - 1]?.timestamp
+        }
+      },
       context: {
         ticketId: this.ticketId,
-        userId: data.assignee_id,
+        userId: ticket.employee_ticket_assignments?.[0]?.employee?.id || null,
         timestamp: Date.now(),
         metadata: {
-          status: data.status,
-          priority: data.priority
+          status: ticket.status,
+          priority: ticket.priority,
+          hasMessages: messages.length > 0,
+          hasComments: comments.length > 0,
+          hasHistory: history.length > 0
         }
       }
     };
   }
 
   private async updateTicket(params: Record<string, any>): Promise<ToolResult> {
-    const { data, error } = await this.supabase
+    // Validate status changes
+    if (params.status) {
+      const validStatuses = ['open', 'in_progress', 'resolved', 'closed'];
+      if (!validStatuses.includes(params.status)) {
+        throw new Error(`Invalid status: ${params.status}. Must be one of: ${validStatuses.join(', ')}`);
+      }
+    }
+
+    // Validate priority changes
+    if (params.priority) {
+      const validPriorities = ['low', 'medium', 'high', 'urgent'];
+      if (!validPriorities.includes(params.priority)) {
+        throw new Error(`Invalid priority: ${params.priority}. Must be one of: ${validPriorities.join(', ')}`);
+      }
+    }
+
+    // Update the ticket
+    const { data: ticket, error: updateError } = await this.supabase
       .from('tickets')
-      .update(params)
+      .update({
+        ...params,
+        updated_at: new Date().toISOString()
+      })
       .eq('id', this.ticketId)
-      .select()
+      .select(`
+        *,
+        employee_ticket_assignments!left(
+          employee:employees(*)
+        )
+      `)
       .single();
 
-    if (error) throw error;
+    if (updateError) throw updateError;
+
+    // Add to ticket history
+    const { error: historyError } = await this.supabase
+      .from('ticket_history')
+      .insert({
+        ticket_id: this.ticketId,
+        changed_by: 'ai-employee',  // Since this is the AI making the change
+        changes: params,
+        created_at: new Date().toISOString()
+      });
+
+    if (historyError) throw historyError;
 
     return {
       success: true,
-      data,
+      data: ticket,
       context: {
         ticketId: this.ticketId,
-        userId: data.assignee_id,
+        userId: ticket.employee_ticket_assignments?.[0]?.employee?.id || null,
         timestamp: Date.now(),
         metadata: {
-          status: data.status,
-          priority: data.priority,
+          status: ticket.status,
+          priority: ticket.priority,
           updatedFields: Object.keys(params)
         }
       }
@@ -110,28 +238,43 @@ export class TicketManagementTool extends Tool {
   }
 
   private async addComment(comment: string): Promise<ToolResult> {
-    const { data, error } = await this.supabase
+    // Add the comment
+    const { data: newComment, error: commentError } = await this.supabase
       .from('ticket_comments')
       .insert({
         ticket_id: this.ticketId,
         content: comment,
-        type: 'internal'
+        type: 'internal',
+        created_at: new Date().toISOString()
       })
       .select()
       .single();
 
-    if (error) throw error;
+    if (commentError) throw commentError;
+
+    // Add to ticket history
+    const { error: historyError } = await this.supabase
+      .from('ticket_history')
+      .insert({
+        ticket_id: this.ticketId,
+        action: 'comment',
+        changes: { comment },
+        created_at: new Date().toISOString()
+      });
+
+    if (historyError) throw historyError;
 
     return {
       success: true,
-      data,
+      data: newComment,
       context: {
         ticketId: this.ticketId,
-        userId: data.created_by,
+        userId: newComment.created_by,
         timestamp: Date.now(),
         metadata: {
-          commentId: data.id,
-          commentType: 'internal'
+          commentId: newComment.id,
+          commentType: 'internal',
+          hasHistory: true
         }
       }
     };

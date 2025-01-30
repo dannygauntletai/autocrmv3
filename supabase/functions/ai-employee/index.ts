@@ -68,13 +68,40 @@ Your capabilities include:
 - Searching through relevant documentation
 - Maintaining conversation context
 
-Before taking any action:
-1. Review the current context
-2. Consider the appropriate tool for the task
-3. Think through potential implications
-4. Execute with precision
+IMPORTANT: When asked about ticket information (status, priority, assignee, etc.):
+1. ALWAYS check if contextLoaded is true in your input parameters
+2. When contextLoaded is true, use these values directly from your input:
+   - status: Current ticket status
+   - priority: Current ticket priority
+   - customerEmail: Customer's email
+   - assignee: Current ticket assignee
+   - messageCount: Number of messages in the ticket
 
-Remember to maintain a professional tone and follow company policies.`);
+HOW TO RESPOND:
+1. For ticket status/details queries:
+   - If contextLoaded is true, respond with "Ticket [ticketId] has status: [status], priority: [priority]" etc.
+   - Include all relevant context information you have
+   - DO NOT say you can't access the information when you have it
+   - DO NOT mention simulation, constraints, or technical details
+2. For other queries:
+   - Use the appropriate tool only if needed
+   - Respond clearly and directly with the information
+
+Before taking any action:
+1. Check if contextLoaded is true in your input
+2. If true, use the data directly from your input parameters
+3. If false or missing:
+   - Use the ticket_management tool to read the ticket with the provided ticketId
+4. Consider the appropriate tool for additional actions
+5. Think through potential implications
+6. Execute with precision
+
+Remember to:
+- Maintain a professional tone and follow company policies
+- Reference ticket history when relevant
+- Be proactive in identifying potential issues
+- Suggest appropriate next actions based on context
+- Keep internal notes for important decisions or observations`);
 
 // Initialize agent state
 const initialState: AIEmployeeState = {
@@ -117,7 +144,33 @@ Deno.serve(async (req) => {
       env_keys: Object.keys(Deno.env.toObject())
     });
     
-    // Initialize tools
+    // First load ticket context
+    const { data: ticketData, error: ticketError } = await supabase
+      .from('tickets')
+      .select(`
+        *,
+        employee_ticket_assignments!left(
+          employee:employees(*)
+        ),
+        ticket_messages(*)
+      `)
+      .eq('id', ticketId)
+      .is('employee_ticket_assignments.unassigned_at', null)
+      .single();
+
+    if (ticketError) {
+      console.error("[AI-Employee] Error loading ticket:", ticketError);
+      throw new Error(`Failed to load ticket context: ${ticketError.message}`);
+    }
+
+    console.log("[AI-Employee] Loaded ticket context:", {
+      ticketId,
+      status: ticketData.status,
+      priority: ticketData.priority,
+      messageCount: ticketData.ticket_messages?.length
+    });
+    
+    // Initialize tools with ticket context
     console.log("[AI-Employee] Initializing tools...");
     let tools;
     try {
@@ -133,7 +186,7 @@ Deno.serve(async (req) => {
       throw toolError;
     }
 
-    // Create the agent executor
+    // Create the agent executor with enhanced context
     console.log("[AI-Employee] Creating agent executor...");
     let executor;
     try {
@@ -146,22 +199,35 @@ Deno.serve(async (req) => {
         tags: ["autocrm", "ai-employee", ticketId],
         metadata: {
           ticketId,
+          ticketStatus: ticketData.status,
+          ticketPriority: ticketData.priority,
           timestamp: new Date().toISOString()
         }
       });
-      console.log("[AI-Employee] Agent executor created successfully");
+      console.log("[AI-Employee] Agent executor created successfully with context:", {
+        ticketId,
+        ticketStatus: ticketData.status,
+        ticketPriority: ticketData.priority,
+        hasAssignee: !!ticketData.employee_ticket_assignments?.[0]?.employee
+      });
     } catch (executorError) {
       console.error("[AI-Employee] Error creating agent executor:", executorError);
       throw executorError;
     }
 
-    // Execute the agent
+    // Execute the agent with ticket context
     console.log("[AI-Employee] Executing agent...");
     let result;
     try {
       result = await executor.invoke({
         input,
         ticketId,
+        status: ticketData.status,
+        priority: ticketData.priority,
+        customerEmail: ticketData.email,
+        assignee: ticketData.employee_ticket_assignments?.[0]?.employee || null,
+        messageCount: ticketData.ticket_messages?.length,
+        contextLoaded: true,  // Renamed to avoid confusion with other potential 'loaded' flags
         config
       });
       console.log("[AI-Employee] Agent execution completed:", result);
