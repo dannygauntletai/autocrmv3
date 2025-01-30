@@ -1,7 +1,7 @@
 import { Tool } from "@langchain/core/tools";
 import { createClient } from "@supabase/supabase-js";
-import { ToolResult } from "../types";
-import type { Database } from "../../../../types/database.types";
+import { ToolResult } from "../types.ts";
+import type { Database } from "../../../../types/database.types.ts";
 
 type KBArticle = Database['public']['Tables']['kb_articles']['Row'];
 type TicketMessage = Database['public']['Tables']['ticket_messages']['Row'];

@@ -26,41 +26,19 @@ export interface AIEmployeeAction {
 export interface AIEmployeeState {
   currentTicket: string | null;
   conversationHistory: BaseMessage[];
-  lastAction: AIEmployeeAction | null;
-  context: {
-    customerInfo?: Record<string, any>;
-    ticketInfo?: Record<string, any>;
-    relevantDocs?: Array<{
-      content: string;
-      metadata: Record<string, any>;
-    }>;
-  };
+  lastAction: string | null;
+  context: Record<string, any>;
   memory: {
-    shortTerm: BaseMessage[];  // Recent messages/actions
-    workingMemory: Record<string, any>;  // Current task-specific data
-    longTerm?: {  // Optional long-term memory for patterns/preferences
-      patterns: Record<string, any>;
-      preferences: Record<string, any>;
-    };
+    shortTerm: BaseMessage[];
+    workingMemory: Record<string, any>;
   };
 }
 
 // Agent Configuration
 export interface AIEmployeeConfig {
-  role: 'support' | 'sales' | 'technical' | 'admin';
-  capabilities: string[];
-  permissions: {
-    canUpdateTickets: boolean;
-    canEscalate: boolean;
-    canAccessCustomerData: boolean;
-    canModifyDatabase: boolean;
-  };
-  llmConfig: {
-    model: string;
-    temperature: number;
-    maxTokens: number;
-  };
-  tools: string[];  // Available tools for this agent
+  temperature?: number;
+  maxTokens?: number;
+  model?: string;
 }
 
 // SQL Toolkit Options

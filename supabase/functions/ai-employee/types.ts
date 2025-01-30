@@ -33,4 +33,21 @@ export interface ToolResult {
   data?: any;
   error?: string;
   context?: ToolContext;
+}
+
+export interface AIEmployeeConfig {
+  temperature?: number;
+  maxTokens?: number;
+  model?: string;
+}
+
+export interface AIEmployeeState {
+  currentTicket: string | null;
+  conversationHistory: BaseMessage[];
+  lastAction: string | null;
+  context: Record<string, any>;
+  memory: {
+    shortTerm: BaseMessage[];
+    workingMemory: Record<string, any>;
+  };
 } 

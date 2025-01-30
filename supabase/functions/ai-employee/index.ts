@@ -3,7 +3,7 @@ import { ChatOpenAI } from '@langchain/openai';
 import { AgentExecutor } from '@langchain/core/executors';
 import { createOpenAIFunctionsAgent } from '@langchain/openai/agents';
 import { RunnableSequence } from '@langchain/core/runnables';
-import { AIEmployeeConfig, AIEmployeeState } from '../../../src/types/agent';
+import { AIEmployeeConfig, AIEmployeeState } from './types.ts';
 import { 
   BaseMessage, 
   AIMessage, 
@@ -14,10 +14,10 @@ import {
   MessagesPlaceholder 
 } from '@langchain/core/prompts';
 
-import { TicketManagementTool } from './tools/ticket';
-import { MemoryManagementTool } from './tools/memory';
-import { SearchTool } from './tools/search';
-import { MessageTool } from './tools/message';
+import { TicketManagementTool } from './tools/ticket.ts';
+import { MemoryManagementTool } from './tools/memory.ts';
+import { SearchTool } from './tools/search.ts';
+import { MessageTool } from './tools/message.ts';
 
 // Initialize Supabase client
 const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
