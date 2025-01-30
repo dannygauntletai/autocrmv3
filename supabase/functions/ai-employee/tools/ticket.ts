@@ -37,6 +37,8 @@ For adding comments, use 'comment' followed by your message.
 For analyzing the ticket (YOLO mode), use 'analyze'.`;
   
   private ticketId: string;
+  private supabaseUrl: string;
+  private supabaseKey: string;
   private supabase;
   private aiEmployeeId = '00000000-0000-0000-0000-000000000000'; // Default AI employee UUID
 
@@ -48,6 +50,8 @@ For analyzing the ticket (YOLO mode), use 'analyze'.`;
   ) {
     super();
     this.ticketId = ticketId;
+    this.supabaseUrl = supabaseUrl;
+    this.supabaseKey = supabaseKey;
     this.supabase = createClient(supabaseUrl, supabaseKey);
     if (aiEmployeeId) {
       this.aiEmployeeId = aiEmployeeId;
@@ -184,66 +188,113 @@ For analyzing the ticket (YOLO mode), use 'analyze'.`;
   }
 
   private async updateTicket(params: Record<string, any>): Promise<ToolResult> {
-    // Validate status changes
-    if (params.status) {
-      const validStatuses = ['new', 'open', 'pending', 'resolved', 'closed'];
-      if (!validStatuses.includes(params.status)) {
-        throw new Error(`Invalid status: ${params.status}. Must be one of: ${validStatuses.join(', ')}`);
-      }
-    }
+    try {
+      let ticket;
 
-    // Validate priority changes
-    if (params.priority) {
-      const validPriorities = ['low', 'medium', 'high', 'urgent'];
-      if (!validPriorities.includes(params.priority)) {
-        throw new Error(`Invalid priority: ${params.priority}. Must be one of: ${validPriorities.join(', ')}`);
-      }
-    }
-
-    // Update the ticket
-    const { data: ticket, error: updateError } = await this.supabase
-      .from('tickets')
-      .update({
-        ...params,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', this.ticketId)
-      .select(`
-        *,
-        employee_ticket_assignments!left(
-          employee:employees(*)
-        )
-      `)
-      .single();
-
-    if (updateError) throw updateError;
-
-    // Add to ticket history
-    const { error: historyError } = await this.supabase
-      .from('ticket_history')
-      .insert({
-        ticket_id: this.ticketId,
-        changed_by: this.aiEmployeeId,
-        changes: params,
-        created_at: new Date().toISOString()
-      });
-
-    if (historyError) throw historyError;
-
-    return {
-      success: true,
-      data: ticket,
-      context: {
-        ticketId: this.ticketId,
-        userId: this.aiEmployeeId,
-        timestamp: Date.now(),
-        metadata: {
-          status: ticket.status,
-          priority: ticket.priority,
-          updatedFields: Object.keys(params)
+      // Update status if provided
+      if (params.status) {
+        const validStatuses = ['new', 'open', 'pending', 'resolved', 'closed'];
+        if (!validStatuses.includes(params.status)) {
+          throw new Error(`Invalid status: ${params.status}. Must be one of: ${validStatuses.join(', ')}`);
         }
+
+        const response = await fetch(`${this.supabaseUrl}/functions/v1/update-ticket-status`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.supabaseKey}`
+          },
+          body: JSON.stringify({
+            ticketId: this.ticketId,
+            status: params.status,
+            reason: params.reason || 'AI Employee update'
+          })
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to update ticket status');
+        }
+
+        const result = await response.json();
+        ticket = result.data;
       }
-    };
+
+      // Update priority if provided
+      if (params.priority) {
+        const validPriorities = ['low', 'medium', 'high', 'urgent'];
+        if (!validPriorities.includes(params.priority)) {
+          throw new Error(`Invalid priority: ${params.priority}. Must be one of: ${validPriorities.join(', ')}`);
+        }
+
+        const response = await fetch(`${this.supabaseUrl}/functions/v1/update-ticket-priority`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.supabaseKey}`
+          },
+          body: JSON.stringify({
+            ticketId: this.ticketId,
+            priority: params.priority,
+            reason: params.reason || 'AI Employee update'
+          })
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to update ticket priority');
+        }
+
+        const result = await response.json();
+        ticket = result.data;
+      }
+
+      // If neither status nor priority was updated, fetch current ticket data
+      if (!ticket) {
+        const { data, error } = await this.supabase
+          .from('tickets')
+          .select(`
+            *,
+            employee_ticket_assignments!left(
+              employee:employees(*)
+            )
+          `)
+          .eq('id', this.ticketId)
+          .single();
+
+        if (error) throw error;
+        ticket = data;
+      }
+
+      return {
+        success: true,
+        data: ticket,
+        context: {
+          ticketId: this.ticketId,
+          userId: this.aiEmployeeId,
+          timestamp: Date.now(),
+          metadata: {
+            status: ticket.status,
+            priority: ticket.priority,
+            updatedFields: Object.keys(params)
+          }
+        }
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "An unknown error occurred",
+        context: {
+          ticketId: this.ticketId,
+          userId: this.aiEmployeeId,
+          timestamp: Date.now(),
+          metadata: {
+            error: true,
+            errorType: error instanceof Error ? error.name : 'Unknown'
+          }
+        }
+      };
+    }
   }
 
   private async addComment(comment: string): Promise<ToolResult> {
