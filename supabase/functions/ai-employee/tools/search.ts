@@ -1,10 +1,14 @@
 import { Tool } from "@langchain/core/tools";
 import { createClient } from "@supabase/supabase-js";
 import { ToolResult } from "../types";
+import type { Database } from "../../../../types/database.types";
+
+type KBArticle = Database['public']['Tables']['kb_articles']['Row'];
+type TicketMessage = Database['public']['Tables']['ticket_messages']['Row'];
 
 export class SearchTool extends Tool {
   name = "search";
-  description = "Search through knowledge base and ticket history. Input should be a JSON string with 'type' ('rag', 'similarity', or 'keyword'), 'query', and optional 'filters'.";
+  description = "Search through knowledge base articles, ticket history, and file embeddings. Input should be a JSON string with 'type' ('rag', 'similarity', or 'keyword'), 'query', and optional 'filters' like category or date range.";
   
   private supabase;
   private supabaseUrl: string;
@@ -17,7 +21,7 @@ export class SearchTool extends Tool {
     super();
     this.supabaseUrl = supabaseUrl;
     this.supabaseKey = supabaseKey;
-    this.supabase = createClient(supabaseUrl, supabaseKey);
+    this.supabase = createClient<Database>(supabaseUrl, supabaseKey);
   }
 
   /** @ignore */
@@ -43,7 +47,11 @@ export class SearchTool extends Tool {
   private async executeSearch(args: {
     type: 'rag' | 'similarity' | 'keyword',
     query: string,
-    filters?: Record<string, any>
+    filters?: {
+      category?: string;
+      dateRange?: { start: string; end: string };
+      tags?: string[];
+    }
   }): Promise<ToolResult> {
     switch (args.type) {
       case 'rag':
@@ -57,98 +65,198 @@ export class SearchTool extends Tool {
     }
   }
 
-  private async performRAGSearch(query: string, filters?: Record<string, any>): Promise<ToolResult> {
-    // First, get relevant documents using similarity search
-    const { data: documents, error: docError } = await this.supabase
-      .rpc('match_documents', {
-        query_embedding: await this.getEmbedding(query),
-        match_threshold: 0.7,
-        match_count: 5,
-        ...filters
+  private async performRAGSearch(
+    query: string, 
+    filters?: {
+      category?: string;
+      dateRange?: { start: string; end: string };
+      tags?: string[];
+    }
+  ): Promise<ToolResult> {
+    const queryEmbedding = await this.getEmbedding(query);
+
+    const { data: articles, error: articleError } = await this.supabase
+      .rpc('search_kb_articles', {
+        search_query: query
       });
 
-    if (docError) throw docError;
+    if (articleError) throw articleError;
 
-    // Then, get relevant ticket history
-    const { data: tickets, error: ticketError } = await this.supabase
-      .from('tickets')
+    const { data: messages, error: messageError } = await this.supabase
+      .from('ticket_messages')
       .select(`
         id,
-        title,
-        description,
-        status,
-        priority,
-        messages(content, type, created_at)
+        message_body,
+        created_at,
+        updated_at,
+        is_internal,
+        sender_id,
+        sender_type,
+        ticket_id,
+        tickets (
+          title,
+          status,
+          priority,
+          category
+        )
       `)
-      .textSearch('title || description', query)
+      .textSearch('message_body', query)
+      .eq('is_internal', false)
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    if (messageError) throw messageError;
+
+    let filteredArticles = articles as KBArticle[];
+    if (filters) {
+      if (filters.category) {
+        filteredArticles = filteredArticles.filter((article: KBArticle) => 
+          article.category_id === filters.category
+        );
+      }
+      if (filters.tags) {
+        filteredArticles = filteredArticles.filter((article: KBArticle) => 
+          article.tags?.some((tag: string) => filters.tags?.includes(tag))
+        );
+      }
+      if (filters.dateRange) {
+        filteredArticles = filteredArticles.filter((article: KBArticle) => 
+          article.created_at >= filters.dateRange!.start && 
+          article.created_at <= filters.dateRange!.end
+        );
+      }
+    }
+
+    const { data: fileEmbeddings, error: fileError } = await (this.supabase as any)
+      .from('file_embeddings')
+      .select('*')
       .limit(3);
 
-    if (ticketError) throw ticketError;
+    if (fileError) throw fileError;
+
+    const typedMessages = messages as unknown as TicketMessage[];
 
     return {
       success: true,
       data: {
-        documents,
-        relatedTickets: tickets
+        knowledgeBase: filteredArticles,
+        relevantMessages: typedMessages,
+        relatedFiles: fileEmbeddings
       },
       context: {
-        ticketId: 'global',  // Search tool operates globally
+        ticketId: 'global',
         userId: 'system',
         timestamp: Date.now(),
         metadata: {
           searchType: 'rag',
-          documentsFound: documents.length,
-          ticketsFound: tickets.length
+          articlesFound: filteredArticles.length,
+          messagesFound: messages?.length ?? 0,
+          filesFound: fileEmbeddings?.length ?? 0,
+          filters: filters ?? 'none'
         }
       }
     };
   }
 
-  private async performSimilaritySearch(query: string, filters?: Record<string, any>): Promise<ToolResult> {
-    const { data, error } = await this.supabase
-      .rpc('match_documents', {
-        query_embedding: await this.getEmbedding(query),
-        match_threshold: 0.7,
-        match_count: 10,
-        ...filters
+  private async performSimilaritySearch(
+    query: string, 
+    filters?: {
+      category?: string;
+      dateRange?: { start: string; end: string };
+      tags?: string[];
+    }
+  ): Promise<ToolResult> {
+    const queryEmbedding = await this.getEmbedding(query);
+
+    const { data: articles, error: articleError } = await this.supabase
+      .rpc('search_kb_articles', {
+        search_query: query
       });
 
-    if (error) throw error;
+    if (articleError) throw articleError;
+
+    let filteredArticles = articles as KBArticle[];
+    if (filters) {
+      if (filters.category) {
+        filteredArticles = filteredArticles.filter((article: KBArticle) => 
+          article.category_id === filters.category
+        );
+      }
+      if (filters.tags) {
+        filteredArticles = filteredArticles.filter((article: KBArticle) => 
+          article.tags?.some((tag: string) => filters.tags?.includes(tag))
+        );
+      }
+    }
 
     return {
       success: true,
-      data,
+      data: filteredArticles,
       context: {
-        ticketId: 'global',  // Search tool operates globally
+        ticketId: 'global',
         userId: 'system',
         timestamp: Date.now(),
         metadata: {
           searchType: 'similarity',
-          documentsFound: data.length
+          documentsFound: filteredArticles.length,
+          filters: filters ?? 'none'
         }
       }
     };
   }
 
-  private async performKeywordSearch(query: string, filters?: Record<string, any>): Promise<ToolResult> {
-    const { data, error } = await this.supabase
-      .from('documents')
-      .select('*')
-      .textSearch('content', query)
+  private async performKeywordSearch(
+    query: string, 
+    filters?: {
+      category?: string;
+      dateRange?: { start: string; end: string };
+      tags?: string[];
+    }
+  ): Promise<ToolResult> {
+    const { data: articles, error: articleError } = await this.supabase
+      .from('kb_articles')
+      .select(`
+        *,
+        category:category_id (
+          name
+        )
+      `)
+      .textSearch('title || content', query)
       .limit(10);
 
-    if (error) throw error;
+    if (articleError) throw articleError;
+
+    let filteredArticles = articles as KBArticle[];
+    if (filters) {
+      if (filters.category) {
+        filteredArticles = filteredArticles.filter((article: KBArticle) => 
+          article.category_id === filters.category
+        );
+      }
+      if (filters.tags) {
+        filteredArticles = filteredArticles.filter((article: KBArticle) => 
+          article.tags?.some((tag: string) => filters.tags?.includes(tag))
+        );
+      }
+      if (filters.dateRange) {
+        filteredArticles = filteredArticles.filter((article: KBArticle) => 
+          article.created_at >= filters.dateRange!.start && 
+          article.created_at <= filters.dateRange!.end
+        );
+      }
+    }
 
     return {
       success: true,
-      data,
+      data: filteredArticles,
       context: {
-        ticketId: 'global',  // Search tool operates globally
+        ticketId: 'global',
         userId: 'system',
         timestamp: Date.now(),
         metadata: {
           searchType: 'keyword',
-          documentsFound: data.length
+          documentsFound: filteredArticles.length,
+          filters: filters ?? 'none'
         }
       }
     };
