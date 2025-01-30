@@ -68,6 +68,37 @@ Your capabilities include:
 - Searching through relevant documentation
 - Maintaining conversation context
 
+TOOL USAGE:
+1. Ticket Management:
+   - Read ticket: "read"
+   - Update status: "update status [new_status]"
+   - Update priority: "update priority [new_priority]"
+   - Add comment: "comment [your message]"
+   - Analyze ticket: "analyze"
+
+2. Messages:
+   - Send message: "send customer/internal [message]"
+   - Generate response: "generate customer/internal [context]"
+   - Analyze message: "analyze [message]"
+
+3. Search:
+   - Basic search: "search [query]"
+   - Date range search: "search [query] from [date] to [date]"
+
+4. Memory Management:
+   - Read memory: "read short_term" or "read working"
+   - Write memory: "write short_term [message]" or "write working KEY=VALUE"
+   - Clear memory: "clear short_term" or "clear working"
+
+SPECIAL COMMANDS:
+- "YOLO": When a user types "YOLO", you will:
+  1. Use the ticket_management tool with the command "analyze"
+  2. This will trigger autonomous analysis and actions:
+     - Ticket resolution status updates
+     - Priority adjustments
+     - Internal notes addition
+  3. Review and report the actions taken
+
 IMPORTANT: When asked about ticket information (status, priority, assignee, etc.):
 1. ALWAYS check if contextLoaded is true in your input parameters
 2. When contextLoaded is true, use these values directly from your input:
@@ -219,20 +250,84 @@ Deno.serve(async (req) => {
     console.log("[AI-Employee] Executing agent...");
     let result;
     try {
+      // Check for YOLO mode
+      const isYoloMode = input.trim().toLowerCase() === "yolo";
+      console.log("[AI-Employee] YOLO mode:", isYoloMode);
+      
+      const agentInput = isYoloMode 
+        ? `Use the ticket_management tool with the command "analyze" to perform a comprehensive analysis of this ticket and take autonomous actions.` 
+        : input;
+      
+      console.log("[AI-Employee] Preparing agent input:", JSON.stringify({
+        isYoloMode,
+        agentInput,
+        ticketId,
+        status: ticketData.status,
+        priority: ticketData.priority,
+        messageCount: ticketData.ticket_messages?.length,
+        config
+      }, null, 2));
+
       result = await executor.invoke({
-        input,
+        input: agentInput,
         ticketId,
         status: ticketData.status,
         priority: ticketData.priority,
         customerEmail: ticketData.email,
         assignee: ticketData.employee_ticket_assignments?.[0]?.employee || null,
         messageCount: ticketData.ticket_messages?.length,
-        contextLoaded: true,  // Renamed to avoid confusion with other potential 'loaded' flags
-        config
+        contextLoaded: true,
+        config: {
+          ...config,
+          isYoloMode
+        }
       });
-      console.log("[AI-Employee] Agent execution completed:", result);
+
+      // Log the raw result before processing
+      console.log("[AI-Employee] Raw agent execution result:", JSON.stringify({
+        resultType: typeof result,
+        resultKeys: result ? Object.keys(result) : null,
+        resultOutput: result?.output,
+        resultError: result?.error,
+        fullResult: result
+      }, null, 2));
+
+      // If YOLO mode and result indicates failure, log more details
+      if (isYoloMode && (!result?.output || result?.output.includes("unsuccessful"))) {
+        console.error("[AI-Employee] YOLO mode execution potentially failed:", JSON.stringify({
+          output: result?.output,
+          error: result?.error,
+          intermediateSteps: result?.intermediateSteps,
+          tools: tools.map(t => ({ name: t.name, description: t.description }))
+        }, null, 2));
+
+        // Try to extract error from intermediate steps
+        if (result?.intermediateSteps) {
+          const lastStep = result.intermediateSteps[result.intermediateSteps.length - 1];
+          if (lastStep?.observation && typeof lastStep.observation === 'string') {
+            try {
+              const observation = JSON.parse(lastStep.observation);
+              if (!observation.success && observation.error) {
+                console.error("[AI-Employee] Found error in last step:", JSON.stringify(observation, null, 2));
+                result.error = observation.error;
+              }
+            } catch (e) {
+              console.log("[AI-Employee] Could not parse last step observation:", lastStep.observation);
+            }
+          }
+        }
+      }
+
+      console.log("[AI-Employee] Agent execution completed:", JSON.stringify(result, null, 2));
     } catch (invokeError) {
-      console.error("[AI-Employee] Error executing agent:", invokeError);
+      console.error("[AI-Employee] Error executing agent:", JSON.stringify({
+        error: {
+          name: invokeError instanceof Error ? invokeError.name : 'Unknown',
+          message: invokeError instanceof Error ? invokeError.message : String(invokeError),
+          stack: invokeError instanceof Error ? invokeError.stack : undefined,
+          cause: invokeError instanceof Error ? invokeError.cause : undefined
+        }
+      }, null, 2));
       throw invokeError;
     }
 
@@ -240,6 +335,14 @@ Deno.serve(async (req) => {
       JSON.stringify({
         success: true,
         data: result
+      }, (_, value) => {
+        if (value === undefined) return null;
+        if (value instanceof Error) return {
+          name: value.name,
+          message: value.message,
+          stack: value.stack
+        };
+        return value;
       }),
       { 
         headers: { 
@@ -250,27 +353,41 @@ Deno.serve(async (req) => {
       }
     );
     
-    console.log("[AI-Employee] Sending response:", {
+    console.log("[AI-Employee] Sending response:", JSON.stringify({
       status: response.status,
       headers: Object.fromEntries(response.headers.entries()),
       body: result
-    });
+    }, null, 2));
     
     return response;
 
   } catch (err) {
     const error = err instanceof Error ? err : new Error(String(err));
-    console.error("[AI-Employee] Error:", {
+    console.error("[AI-Employee] Error:", JSON.stringify({
       name: error.name,
       message: error.message,
       stack: error.stack,
-      cause: error.cause
-    });
+      cause: error.cause,
+      raw: err
+    }, null, 2));
     
     const errorResponse = new Response(
       JSON.stringify({
         success: false,
-        error: error.message
+        error: error.message,
+        details: {
+          name: error.name,
+          stack: error.stack,
+          cause: error.cause
+        }
+      }, (_, value) => {
+        if (value === undefined) return null;
+        if (value instanceof Error) return {
+          name: value.name,
+          message: value.message,
+          stack: value.stack
+        };
+        return value;
       }),
       { 
         headers: { 

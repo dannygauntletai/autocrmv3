@@ -7,7 +7,9 @@ type TicketMessage = Database['public']['Tables']['ticket_messages']['Row'];
 
 export class SearchTool extends Tool {
   name = "search";
-  description = "Search through ticket history and messages. Input should be a JSON string with 'query' and optional 'filters' like date range.";
+  description = `Search through ticket history and messages.
+Use 'search QUERY' to search messages.
+Use 'search QUERY from DATE to DATE' for date-filtered search.`;
   
   private supabase;
   private supabaseUrl: string;
@@ -28,22 +30,41 @@ export class SearchTool extends Tool {
   async _call(input: string): Promise<string> {
     try {
       console.log("[SearchTool] Received input:", input);
-      const parsed = JSON.parse(input);
-      console.log("[SearchTool] Parsed input:", parsed);
-      const result = await this.searchMessages(parsed.query, parsed.filters);
+      const parts = input.trim().split(' ');
+      let query: string;
+      const filters: { dateRange?: { start: string; end: string } } = {};
+
+      // Check for date range format: "search QUERY from DATE to DATE"
+      const fromIndex = parts.indexOf('from');
+      const toIndex = parts.indexOf('to');
+      
+      if (fromIndex !== -1 && toIndex !== -1 && fromIndex < toIndex) {
+        query = parts.slice(0, fromIndex).join(' ');
+        filters.dateRange = {
+          start: parts[fromIndex + 1],
+          end: parts[toIndex + 1]
+        };
+      } else {
+        query = parts.join(' ');
+      }
+
+      console.log("[SearchTool] Parsed query:", { query, filters });
+      const result = await this.searchMessages(query, filters);
       console.log("[SearchTool] Search result:", result);
-      return JSON.stringify(result);
+      return JSON.stringify(result, (_, value) => {
+        if (value === undefined) return null;
+        if (value instanceof Error) return value.message;
+        return value;
+      });
     } catch (error) {
       console.error("[SearchTool] Error in _call:", error);
-      if (error instanceof Error) {
-        return JSON.stringify({
-          success: false,
-          error: error.message
-        });
-      }
       return JSON.stringify({
         success: false,
-        error: "An unknown error occurred"
+        error: error instanceof Error ? error.message : "An unknown error occurred"
+      }, (_, value) => {
+        if (value === undefined) return null;
+        if (value instanceof Error) return value.message;
+        return value;
       });
     }
   }
@@ -118,7 +139,7 @@ export class SearchTool extends Tool {
     }
 
     // Filter valid messages
-    const validMessages = messages.filter(this.isTicketMessage);
+    const validMessages = messages.filter((msg): msg is TicketMessage => this.isTicketMessage(msg));
     console.log("[SearchTool] Valid messages after type check:", validMessages.length);
 
     let filteredMessages = validMessages;
@@ -137,7 +158,7 @@ export class SearchTool extends Tool {
       });
     }
 
-    const result = {
+    return {
       success: true,
       data: filteredMessages,
       context: {
@@ -151,8 +172,5 @@ export class SearchTool extends Tool {
         }
       }
     };
-
-    console.log("[SearchTool] Final result:", result);
-    return result;
   }
 } 

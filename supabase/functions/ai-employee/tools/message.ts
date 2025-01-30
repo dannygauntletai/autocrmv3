@@ -4,7 +4,10 @@ import { ToolResult } from '../types.ts';
 
 export class MessageTool extends Tool {
   name = "message";
-  description = "Handle message operations including sending responses and analyzing messages. Input should be a JSON string with 'action' ('send', 'generate', or 'analyze'), 'type' ('customer' or 'internal'), and 'content'.";
+  description = `Handle message operations including sending responses and analyzing messages.
+For sending messages, use 'send customer/internal YOUR MESSAGE'.
+For generating responses, use 'generate customer/internal CONTEXT'.
+For analyzing messages, use 'analyze MESSAGE'.`;
   
   private ticketId: string;
   private supabase;
@@ -26,9 +29,26 @@ export class MessageTool extends Tool {
   /** @ignore */
   async _call(input: string): Promise<string> {
     try {
-      const parsed = JSON.parse(input);
-      const result = await this.executeAction(parsed);
-      return JSON.stringify(result);
+      const [action, messageType, ...contentParts] = input.trim().split(' ');
+      const content = contentParts.join(' ');
+
+      if (action === 'send' || action === 'generate') {
+        if (messageType !== 'customer' && messageType !== 'internal') {
+          throw new Error("Type must be 'customer' or 'internal'");
+        }
+        
+        if (action === 'send') {
+          return JSON.stringify(await this.sendMessage(messageType as 'customer' | 'internal', content));
+        } else {
+          return JSON.stringify(await this.generateResponse(messageType as 'customer' | 'internal', content));
+        }
+      }
+
+      if (action === 'analyze') {
+        return JSON.stringify(await this.analyzeMessage(content));
+      }
+
+      throw new Error(`Unknown action: ${action}. Use 'send', 'generate', or 'analyze'.`);
     } catch (error) {
       if (error instanceof Error) {
         return JSON.stringify({
@@ -40,23 +60,6 @@ export class MessageTool extends Tool {
         success: false,
         error: "An unknown error occurred"
       });
-    }
-  }
-
-  private async executeAction(args: {
-    action: 'send' | 'generate' | 'analyze',
-    type: 'customer' | 'internal',
-    content: string
-  }): Promise<ToolResult> {
-    switch (args.action) {
-      case 'send':
-        return await this.sendMessage(args.type, args.content);
-      case 'generate':
-        return await this.generateResponse(args.type, args.content);
-      case 'analyze':
-        return await this.analyzeMessage(args.content);
-      default:
-        throw new Error(`Unknown action: ${args.action}`);
     }
   }
 

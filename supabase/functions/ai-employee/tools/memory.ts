@@ -1,11 +1,16 @@
 import { Tool } from 'langchain/tools';
 import { createClient } from '@supabase/supabase-js';
 import { ToolResult } from '../types.ts';
-import { BaseMessage } from 'langchain/schema';
+import { BaseMessage, HumanMessage } from 'langchain/schema';
 
 export class MemoryManagementTool extends Tool {
   name = "memory_management";
-  description = "Manage conversation memory including short-term and working memory. Input should be a JSON string with 'operation' ('read', 'write', or 'clear'), 'type' ('short_term' or 'working'), and optional 'data'.";
+  description = `Manage conversation memory including short-term and working memory.
+Use 'read short_term' to read short-term memory.
+Use 'read working' to read working memory.
+Use 'write short_term MESSAGE' to add to short-term memory.
+Use 'write working KEY=VALUE' to add to working memory.
+Use 'clear short_term/working' to clear memory.`;
   
   private ticketId: string;
   private supabase;
@@ -25,38 +30,56 @@ export class MemoryManagementTool extends Tool {
   /** @ignore */
   async _call(input: string): Promise<string> {
     try {
-      const parsed = JSON.parse(input);
-      const result = await this.executeOperation(parsed);
-      return JSON.stringify(result);
-    } catch (error) {
-      if (error instanceof Error) {
-        return JSON.stringify({
-          success: false,
-          error: error.message
-        });
+      const [operation, memoryType, ...dataParts] = input.trim().split(' ');
+      const data = dataParts.join(' ');
+
+      if (!['read', 'write', 'clear'].includes(operation)) {
+        throw new Error("Operation must be 'read', 'write', or 'clear'");
       }
+
+      if (memoryType !== 'short_term' && memoryType !== 'working') {
+        throw new Error("Type must be 'short_term' or 'working'");
+      }
+
+      const type = memoryType as 'short_term' | 'working';
+      let result: ToolResult;
+
+      switch (operation) {
+        case 'read':
+          result = await this.readMemory(type);
+          break;
+        case 'write':
+          if (!data) throw new Error("Data is required for write operation");
+          if (type === 'working') {
+            // Parse KEY=VALUE format for working memory
+            const [key, value] = data.split('=');
+            if (!key || !value) throw new Error("Working memory writes must be in KEY=VALUE format");
+            result = await this.writeMemory(type, { [key.trim()]: value.trim() });
+          } else {
+            result = await this.writeMemory(type, [new HumanMessage(data)]);
+          }
+          break;
+        case 'clear':
+          result = await this.clearMemory(type);
+          break;
+        default:
+          throw new Error(`Unknown operation: ${operation}`);
+      }
+
+      return JSON.stringify(result, (_, value) => {
+        if (value === undefined) return null;
+        if (value instanceof Error) return value.message;
+        return value;
+      });
+    } catch (error) {
       return JSON.stringify({
         success: false,
-        error: "An unknown error occurred"
+        error: error instanceof Error ? error.message : "An unknown error occurred"
+      }, (_, value) => {
+        if (value === undefined) return null;
+        if (value instanceof Error) return value.message;
+        return value;
       });
-    }
-  }
-
-  private async executeOperation(args: { 
-    operation: 'read' | 'write' | 'clear',
-    type: 'short_term' | 'working',
-    data?: any 
-  }): Promise<ToolResult> {
-    switch (args.operation) {
-      case 'read':
-        return await this.readMemory(args.type);
-      case 'write':
-        if (!args.data) throw new Error("Data is required for write operation");
-        return await this.writeMemory(args.type, args.data);
-      case 'clear':
-        return await this.clearMemory(args.type);
-      default:
-        throw new Error(`Unknown operation: ${args.operation}`);
     }
   }
 
