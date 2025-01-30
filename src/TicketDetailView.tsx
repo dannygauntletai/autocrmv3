@@ -3,8 +3,8 @@ import { InternalNotesPanel } from "./InternalNotesPanel";
 import { CustomFieldsPanel } from "./CustomFieldsPanel";
 import { EmployeeAssignmentPanel } from "./EmployeeAssignmentPanel";
 import { TicketDetailCenterSection } from "./TicketDetailCenterSection";
+import { AgentPanel } from "./components/AgentPanel";
 import { useState } from "react";
-import { AIChatbot } from "./AIChatbot";
 
 interface Props {
   ticketId: string;
@@ -17,7 +17,7 @@ export const TicketDetailView = ({
 }: Props) => {
   // Keep track of the currently viewed ticket
   const [currentTicketId, setCurrentTicketId] = useState(initialTicketId);
-  const [showAIChat, setShowAIChat] = useState(false);
+  const [showAgent, setShowAgent] = useState(false);
 
   const handleTicketSelect = (id: string) => {
     // Just update the current ticket ID
@@ -34,20 +34,25 @@ export const TicketDetailView = ({
         <EmployeeAssignmentPanel ticketId={currentTicketId} />
         <InternalNotesPanel ticketId={currentTicketId} />
         <CustomFieldsPanel ticketId={currentTicketId} />
+        
+        {/* Toggle Agent Button */}
+        <button
+          onClick={() => setShowAgent(!showAgent)}
+          className="w-full py-2 px-4 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+        >
+          {showAgent ? 'Hide AI Assistant' : 'Show AI Assistant'}
+        </button>
+
+        {/* Agent Panel */}
+        {showAgent && (
+          <div className="h-96">
+            <AgentPanel 
+              ticketId={currentTicketId}
+              onClose={() => setShowAgent(false)}
+            />
+          </div>
+        )}
       </div>
-      
-      {/* AI Chatbot with context */}
-      {showAIChat && (
-        <AIChatbot 
-          onClose={() => setShowAIChat(false)}
-          currentView={{
-            type: 'ticket_detail',
-            data: {
-              ticketId: currentTicketId
-            }
-          }}
-        />
-      )}
     </div>
   );
 };
