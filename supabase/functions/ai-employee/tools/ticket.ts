@@ -324,28 +324,32 @@ For analyzing the ticket (YOLO mode), use 'analyze'.`;
 
   private async analyzeAndActOnTicket(): Promise<ToolResult> {
     try {
-      console.log("[TicketTool] Starting ticket analysis");
+      console.log("[TicketTool] Starting ticket analysis for ticket ID:", this.ticketId);
       
       // First, get all ticket data
+      console.log("[TicketTool] Attempting to read ticket data...");
       const ticketData = await this.readTicket();
-      console.log("[TicketTool] Read ticket data:", JSON.stringify({
+      console.log("[TicketTool] Ticket data response:", {
         success: ticketData.success,
-        ticketInfo: {
-          status: ticketData.data?.ticket?.status,
-          priority: ticketData.data?.ticket?.priority,
-          messageCount: ticketData.data?.stats?.messageCount,
-          lastActivity: ticketData.data?.stats?.lastActivity
-        }
-      }, null, 2));
+        hasTicket: !!ticketData.data?.ticket,
+        hasTimeline: !!ticketData.data?.timeline,
+        hasStats: !!ticketData.data?.stats,
+        ticketInfo: ticketData.data?.ticket ? {
+          status: ticketData.data.ticket.status,
+          priority: ticketData.data.ticket.priority,
+          title: ticketData.data.ticket.title,
+          messageCount: ticketData.data.stats?.messageCount
+        } : null
+      });
 
       if (!ticketData.success || !ticketData.data) {
         console.error("[TicketTool] Failed to read ticket data:", ticketData);
-        throw new Error("Failed to read ticket data for analysis");
+        throw new Error(`Failed to read ticket data for analysis. Ticket ID: ${this.ticketId}`);
       }
 
       if (!ticketData.data.ticket) {
         console.error("[TicketTool] Ticket data missing ticket object:", ticketData.data);
-        throw new Error("Ticket data is incomplete");
+        throw new Error(`Ticket data is incomplete. Ticket ID: ${this.ticketId}`);
       }
 
       if (!ticketData.data.timeline) {
@@ -425,20 +429,76 @@ For analyzing the ticket (YOLO mode), use 'analyze'.`;
         .filter((item: TimelineItem) => item.type === 'message' && item.sender_type === 'customer')
         .pop();
 
+      console.log("[TicketTool] Last customer message:", {
+        exists: !!lastCustomerMessage,
+        messageBody: lastCustomerMessage?.message_body?.substring(0, 100),
+        timestamp: lastCustomerMessage?.timestamp
+      });
+
       // Generate appropriate messages based on context
       if (lastCustomerMessage?.message_body) {
-        if (lastCustomerMessage.message_body.toLowerCase().includes('refund')) {
-          actions.internalNote = "Customer requesting refund. Escalating for review.";
-          actions.customerMessage = "Thank you for your refund request. I've escalated this to our billing team for review. They will get back to you within 24 hours.";
-          actions.priority = 'high';
-        } else if (lastCustomerMessage.message_body.toLowerCase().includes('bug') || 
-                  lastCustomerMessage.message_body.toLowerCase().includes('error')) {
-          actions.internalNote = "Potential technical issue reported. Needs technical review.";
-          actions.customerMessage = "I understand you're experiencing technical difficulties. Our engineering team has been notified and will investigate this issue. We'll keep you updated on our progress.";
-          actions.priority = 'high';
-        } else if (daysSinceLastActivity >= 1 && !hasCustomerResponse) {
-          actions.customerMessage = "I noticed there hasn't been any recent activity on your ticket. Are you still experiencing this issue? Please let us know if you need further assistance.";
+        console.log("[TicketTool] Calling generate-response function...");
+        const supabaseUrl = Deno.env.get('SUPABASE_URL');
+        const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+        
+        console.log("[TicketTool] Environment check:", {
+          hasSupabaseUrl: !!supabaseUrl,
+          hasServiceRoleKey: !!serviceRoleKey,
+          ticketId: this.ticketId
+        });
+
+        // Call the response generation edge function
+        const response = await fetch(`${supabaseUrl}/functions/v1/generate-response`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${serviceRoleKey}`
+          },
+          body: JSON.stringify({
+            ticketId: this.ticketId,
+            type: 'customer'
+          })
+        });
+
+        console.log("[TicketTool] Generate response status:", {
+          status: response.status,
+          ok: response.ok,
+          statusText: response.statusText
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error("[TicketTool] Failed to generate response:", {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorText
+          });
+          throw new Error(`Failed to generate response: ${errorText}`);
         }
+
+        const result = await response.json();
+        console.log("[TicketTool] Generated response result:", {
+          hasResponse: !!result.response,
+          hasAnalysis: !!result.analysis,
+          hasSuggestedPriority: !!result.suggestedPriority,
+          responseLength: result.response?.length
+        });
+        
+        // Set the generated messages
+        actions.customerMessage = result.response;
+        actions.internalNote = `AI Analysis: ${result.analysis || 'No specific analysis provided'}`;
+        
+        // Update priority if suggested by the LLM
+        if (result.suggestedPriority && result.suggestedPriority !== ticket.priority) {
+          console.log("[TicketTool] Updating priority:", {
+            current: ticket.priority,
+            suggested: result.suggestedPriority
+          });
+          actions.priority = result.suggestedPriority;
+          actions.comment = (actions.comment || '') + `\nPriority updated to ${result.suggestedPriority} based on AI analysis.`;
+        }
+      } else if (daysSinceLastActivity >= 1 && !hasCustomerResponse) {
+        actions.customerMessage = "I noticed there hasn't been any recent activity on your ticket. Are you still experiencing this issue? Please let us know if you need further assistance.";
       }
 
       // Ensure at least one action is taken in YOLO mode

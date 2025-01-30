@@ -172,19 +172,16 @@ serve(async (req) => {
     if (!authHeader) {
       throw new Error('Missing Authorization header');
     }
-    const jwt = authHeader.replace('Bearer ', '');
+    const serviceRoleKey = authHeader.replace('Bearer ', '');
 
     // Check Supabase configuration
     console.log('Supabase URL configured:', !!Deno.env.get('SUPABASE_URL'));
-    console.log('Supabase Anon Key configured:', !!Deno.env.get('SUPABASE_ANON_KEY'));
+    console.log('Service Role Key matches:', serviceRoleKey === Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
 
     const supabaseClient = createClient<Database>(
       Deno.env.get('SUPABASE_URL') || '',
-      Deno.env.get('SUPABASE_ANON_KEY') || '',
+      serviceRoleKey,
       {
-        global: {
-          headers: { Authorization: `Bearer ${jwt}` }
-        },
         auth: {
           autoRefreshToken: false,
           persistSession: false
@@ -192,24 +189,11 @@ serve(async (req) => {
       }
     )
 
-    // Get employee data for response context
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(jwt);
-    
-    if (authError || !user) {
-      console.error('Error getting authenticated user:', authError);
-      throw new Error('Could not get authenticated user data');
-    }
-
-    const { data: employeeData, error: employeeError } = await supabaseClient
-      .from('employees')
-      .select('name')
-      .eq('email', user.email)
-      .maybeSingle();
-
-    if (employeeError || !employeeData) {
-      console.error('Error fetching employee data:', employeeError);
-      throw new Error('Could not get employee data');
-    }
+    // Since we're using service role key, we'll use a fixed AI employee identity
+    const aiEmployeeData = {
+      name: 'AI Support Agent',
+      email: 'ai.support@autocrm.com'
+    };
 
     // Fetch ticket data
     console.log('Fetching ticket data...');
@@ -429,12 +413,12 @@ serve(async (req) => {
     const messages = [
       {
         role: "system" as const,
-        content: `You are ${employeeData.name}, a customer support agent for ${ticket.team_ticket_assignments[0]?.teams?.name || 'our'} team.
+        content: `You are ${aiEmployeeData.name}, a customer support agent for ${ticket.team_ticket_assignments[0]?.teams?.name || 'our'} team.
 You are writing a response to ${customerData?.name || 'the customer'} (${ticket.email}).
 Use the conversation history, similar past conversations, and relevant team documents to provide accurate and helpful responses.
 When using information from team documents, acknowledge the source in a natural way.
 Maintain a professional and friendly tone.
-Always sign your response with your name: ${employeeData.name}`
+Always sign your response with your name: ${aiEmployeeData.name}`
       },
       {
         role: "user" as const,
