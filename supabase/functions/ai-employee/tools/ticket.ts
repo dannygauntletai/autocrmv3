@@ -38,15 +38,20 @@ For analyzing the ticket (YOLO mode), use 'analyze'.`;
   
   private ticketId: string;
   private supabase;
+  private aiEmployeeId = '00000000-0000-0000-0000-000000000000'; // Default AI employee UUID
 
   constructor(
     ticketId: string,
     supabaseUrl: string,
-    supabaseKey: string
+    supabaseKey: string,
+    aiEmployeeId?: string
   ) {
     super();
     this.ticketId = ticketId;
     this.supabase = createClient(supabaseUrl, supabaseKey);
+    if (aiEmployeeId) {
+      this.aiEmployeeId = aiEmployeeId;
+    }
   }
 
   /** @ignore */
@@ -181,7 +186,7 @@ For analyzing the ticket (YOLO mode), use 'analyze'.`;
   private async updateTicket(params: Record<string, any>): Promise<ToolResult> {
     // Validate status changes
     if (params.status) {
-      const validStatuses = ['open', 'in_progress', 'resolved', 'closed'];
+      const validStatuses = ['new', 'open', 'pending', 'resolved', 'closed'];
       if (!validStatuses.includes(params.status)) {
         throw new Error(`Invalid status: ${params.status}. Must be one of: ${validStatuses.join(', ')}`);
       }
@@ -218,7 +223,7 @@ For analyzing the ticket (YOLO mode), use 'analyze'.`;
       .from('ticket_history')
       .insert({
         ticket_id: this.ticketId,
-        changed_by: 'ai-employee',  // Since this is the AI making the change
+        changed_by: this.aiEmployeeId,
         changes: params,
         created_at: new Date().toISOString()
       });
@@ -230,7 +235,7 @@ For analyzing the ticket (YOLO mode), use 'analyze'.`;
       data: ticket,
       context: {
         ticketId: this.ticketId,
-        userId: ticket.employee_ticket_assignments?.[0]?.employee?.id || null,
+        userId: this.aiEmployeeId,
         timestamp: Date.now(),
         metadata: {
           status: ticket.status,
@@ -242,15 +247,14 @@ For analyzing the ticket (YOLO mode), use 'analyze'.`;
   }
 
   private async addComment(comment: string): Promise<ToolResult> {
-    // Add the comment as a message
     const { data: newMessage, error: messageError } = await this.supabase
       .from('ticket_messages')
       .insert({
         ticket_id: this.ticketId,
         message_body: comment,
-        sender_type: 'internal',
+        sender_type: 'employee',
         is_internal: true,
-        sender_id: 'ai-employee',
+        sender_id: this.aiEmployeeId,
         created_at: new Date().toISOString()
       })
       .select()
@@ -263,7 +267,7 @@ For analyzing the ticket (YOLO mode), use 'analyze'.`;
       .from('ticket_history')
       .insert({
         ticket_id: this.ticketId,
-        changed_by: 'ai-employee',
+        changed_by: this.aiEmployeeId,
         changes: { message: comment },
         created_at: new Date().toISOString()
       });
@@ -275,12 +279,44 @@ For analyzing the ticket (YOLO mode), use 'analyze'.`;
       data: newMessage,
       context: {
         ticketId: this.ticketId,
-        userId: 'ai-employee',
+        userId: this.aiEmployeeId,
         timestamp: Date.now(),
         metadata: {
           messageId: newMessage.id,
           messageType: 'internal',
           hasHistory: true
+        }
+      }
+    };
+  }
+
+  private async addMessage(message: string, isInternal: boolean): Promise<ToolResult> {
+    const { data: newMessage, error: messageError } = await this.supabase
+      .from('ticket_messages')
+      .insert({
+        ticket_id: this.ticketId,
+        message_body: message,
+        sender_type: isInternal ? 'employee' : 'agent',
+        is_internal: isInternal,
+        sender_id: this.aiEmployeeId,
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (messageError) throw messageError;
+
+    return {
+      success: true,
+      data: newMessage,
+      context: {
+        ticketId: this.ticketId,
+        userId: this.aiEmployeeId,
+        timestamp: Date.now(),
+        metadata: {
+          messageId: newMessage.id,
+          messageType: isInternal ? 'internal' : 'customer',
+          isInternal
         }
       }
     };
@@ -331,6 +367,8 @@ For analyzing the ticket (YOLO mode), use 'analyze'.`;
         status?: string;
         priority?: string;
         comment?: string;
+        customerMessage?: string;
+        internalNote?: string;
       } = {};
 
       console.log("[TicketTool] Analyzing ticket state:", JSON.stringify({
@@ -356,6 +394,7 @@ For analyzing the ticket (YOLO mode), use 'analyze'.`;
         timelineLength: timeline.length
       });
 
+      // Primary action checks
       if (!hasCustomerResponse && daysSinceLastActivity > 2 && ticket.status !== 'resolved') {
         actions.status = 'resolved';
         actions.comment = "Automatically resolving ticket due to no customer response for over 2 days.";
@@ -381,6 +420,43 @@ For analyzing the ticket (YOLO mode), use 'analyze'.`;
         console.log("[TicketTool] Deciding to escalate priority due to urgent keywords");
       }
 
+      // Enhanced message generation based on ticket context
+      const lastCustomerMessage = timeline
+        .filter((item: TimelineItem) => item.type === 'message' && item.sender_type === 'customer')
+        .pop();
+
+      // Generate appropriate messages based on context
+      if (lastCustomerMessage?.message_body) {
+        if (lastCustomerMessage.message_body.toLowerCase().includes('refund')) {
+          actions.internalNote = "Customer requesting refund. Escalating for review.";
+          actions.customerMessage = "Thank you for your refund request. I've escalated this to our billing team for review. They will get back to you within 24 hours.";
+          actions.priority = 'high';
+        } else if (lastCustomerMessage.message_body.toLowerCase().includes('bug') || 
+                  lastCustomerMessage.message_body.toLowerCase().includes('error')) {
+          actions.internalNote = "Potential technical issue reported. Needs technical review.";
+          actions.customerMessage = "I understand you're experiencing technical difficulties. Our engineering team has been notified and will investigate this issue. We'll keep you updated on our progress.";
+          actions.priority = 'high';
+        } else if (daysSinceLastActivity >= 1 && !hasCustomerResponse) {
+          actions.customerMessage = "I noticed there hasn't been any recent activity on your ticket. Are you still experiencing this issue? Please let us know if you need further assistance.";
+        }
+      }
+
+      // Ensure at least one action is taken in YOLO mode
+      if (Object.keys(actions).length === 0) {
+        console.log("[TicketTool] No primary actions needed, applying YOLO mode default actions");
+        
+        // Default message actions
+        actions.internalNote = "YOLO mode activated - Performing routine check on ticket.";
+        
+        if (ticket.status === 'new') {
+          actions.status = 'open';
+          actions.customerMessage = "Thank you for reaching out to us. I'm reviewing your request and will get back to you shortly.";
+        } else if (ticket.status === 'open' && daysSinceLastActivity >= 1) {
+          actions.status = 'pending';
+          actions.customerMessage = "I'm following up on your request. Could you please confirm if you still need assistance with this matter?";
+        }
+      }
+
       // Take actions
       const results: ToolResult[] = [];
       console.log("[TicketTool] Planned actions:", actions);
@@ -400,11 +476,18 @@ For analyzing the ticket (YOLO mode), use 'analyze'.`;
           results.push(updateResult);
         }
 
-        // Add comment if needed
-        if (actions.comment) {
-          console.log("[TicketTool] Adding comment:", actions.comment);
-          const commentResult = await this.addComment(actions.comment);
-          results.push(commentResult);
+        // Add internal note if needed
+        if (actions.internalNote) {
+          console.log("[TicketTool] Adding internal note:", actions.internalNote);
+          const internalResult = await this.addMessage(actions.internalNote, true);
+          results.push(internalResult);
+        }
+
+        // Add customer message if needed
+        if (actions.customerMessage) {
+          console.log("[TicketTool] Adding customer message:", actions.customerMessage);
+          const customerResult = await this.addMessage(actions.customerMessage, false);
+          results.push(customerResult);
         }
       } else {
         console.log("[TicketTool] No actions needed for this ticket");
@@ -425,7 +508,7 @@ For analyzing the ticket (YOLO mode), use 'analyze'.`;
         },
         context: {
           ticketId: this.ticketId,
-          userId: 'ai_employee',
+          userId: this.aiEmployeeId,
           timestamp: Date.now(),
           metadata: {
             actionsCount: Object.keys(actions).length,
@@ -451,7 +534,7 @@ For analyzing the ticket (YOLO mode), use 'analyze'.`;
         error: error instanceof Error ? error.message : String(error),
         context: {
           ticketId: this.ticketId,
-          userId: 'ai_employee',
+          userId: this.aiEmployeeId,
           timestamp: Date.now(),
           metadata: {
             errorType: error instanceof Error ? error.name : typeof error,
