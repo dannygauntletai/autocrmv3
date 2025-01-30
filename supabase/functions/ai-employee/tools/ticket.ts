@@ -296,7 +296,7 @@ For analyzing the ticket (YOLO mode), use 'analyze'.`;
       .insert({
         ticket_id: this.ticketId,
         message_body: message,
-        sender_type: isInternal ? 'employee' : 'agent',
+        sender_type: 'employee',
         is_internal: isInternal,
         sender_id: this.aiEmployeeId,
         created_at: new Date().toISOString()
