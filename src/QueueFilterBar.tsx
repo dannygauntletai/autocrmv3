@@ -1,16 +1,18 @@
-import { Search, Filter } from "lucide-react";
+import { Search, Filter, Hash } from "lucide-react";
 import { useState } from "react";
 
 interface FilterProps {
   onSearchChange: (search: string) => void;
   onStatusChange: (status: string) => void;
   onPriorityChange: (priority: string) => void;
+  onTicketIdChange?: (ticketId: string) => void;
 }
 
 export const QueueFilterBar = ({
   onSearchChange,
   onStatusChange,
-  onPriorityChange
+  onPriorityChange,
+  onTicketIdChange
 }: FilterProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [showMoreFilters, setShowMoreFilters] = useState(false);
@@ -18,7 +20,19 @@ export const QueueFilterBar = ({
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setSearchQuery(value);
-    onSearchChange(value);
+    
+    // Remove # and whitespace
+    const cleanValue = value.replace('#', '').trim();
+    
+    // If it's an exact UUID, use the ticket ID filter
+    if (cleanValue.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+      onTicketIdChange?.(cleanValue);
+      onSearchChange('');
+    } else {
+      // For partial searches or non-UUID searches, use the regular search
+      onTicketIdChange?.('');
+      onSearchChange(cleanValue);
+    }
   };
 
   const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -38,7 +52,7 @@ export const QueueFilterBar = ({
             type="text" 
             value={searchQuery}
             onChange={handleSearchChange}
-            placeholder="Search tickets..." 
+            placeholder="Search tickets or enter #ID..." 
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" 
           />
         </div>

@@ -14,6 +14,7 @@ export const TicketQueueList = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("");
+  const [ticketIdFilter, setTicketIdFilter] = useState("");
 
   const { role, loading: roleLoading } = useEmployeeRole();
   const { tickets: personalTickets, loading: personalTicketsLoading, error: personalTicketsError } = useAssignedTickets();
@@ -34,9 +35,19 @@ export const TicketQueueList = () => {
   const queueTitle = isSupervisor ? 'Team Queue' : 'My Tickets';
 
   const filteredTickets = tickets.filter((ticket: TicketListItemType) => {
-    const matchesSearch = !searchQuery || ticket.subject.toLowerCase().includes(searchQuery.toLowerCase());
+    // If there's a ticket ID filter, only match exact ID
+    if (ticketIdFilter) {
+      return ticket.id === ticketIdFilter;
+    }
+    
+    // Otherwise, apply regular filters
+    const matchesSearch = !searchQuery || 
+      ticket.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      ticket.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      ticket.id.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = !statusFilter || ticket.status === statusFilter;
     const matchesPriority = !priorityFilter || ticket.priority === priorityFilter;
+    
     return matchesSearch && matchesStatus && matchesPriority;
   });
 
@@ -54,6 +65,7 @@ export const TicketQueueList = () => {
           onSearchChange={setSearchQuery}
           onStatusChange={setStatusFilter}
           onPriorityChange={setPriorityFilter}
+          onTicketIdChange={setTicketIdFilter}
         />
         {selectedTickets.length > 0 && (
           <BulkOperationsToolbar 
