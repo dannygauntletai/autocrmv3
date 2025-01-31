@@ -1,4 +1,4 @@
-import { Search, Filter, Hash } from "lucide-react";
+import { Search, Filter } from "lucide-react";
 import { useState } from "react";
 
 interface FilterProps {
