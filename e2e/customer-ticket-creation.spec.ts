@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test';
+import { generateTicketData } from './test-helpers';
 
 test.describe('Customer Ticket Creation Flow', () => {
   test('should create a new ticket as a guest customer', async ({ page }) => {
-    // Generate a random ticket title to verify later
-    const randomTitle = `Test Ticket ${Math.random().toString(36).substring(7)}`;
+    // Generate ticket data using LLM
+    const ticketData = await generateTicketData();
     
     // Navigate to home page
     await page.goto('/');
@@ -20,15 +21,15 @@ test.describe('Customer Ticket Creation Flow', () => {
     // Click New Ticket in the sidebar
     await page.getByRole('link', { name: 'New Ticket' }).click();
     
-    // Fill in ticket details
-    await page.getByLabel('Subject').fill(randomTitle);
-    await page.getByLabel('Description').fill('This is a test ticket description');
+    // Fill in ticket details with generated data
+    await page.getByLabel('Subject').fill(ticketData.subject);
+    await page.getByLabel('Description').fill(ticketData.description);
     
-    // Select first category (team) from dropdown
-    await page.getByLabel('Category').selectOption({ index: 1 }); // Index 1 because index 0 is "Select a category"
+    // Select category from dropdown
+    await page.getByLabel('Category').selectOption(ticketData.category);
     
-    // Select priority (defaults to low, but let's explicitly set it)
-    await page.getByLabel('Priority').selectOption('low');
+    // Select priority
+    await page.getByLabel('Priority').selectOption(ticketData.priority);
     
     // Create the ticket
     await page.getByRole('button', { name: /create/i }).click();
@@ -40,6 +41,6 @@ test.describe('Customer Ticket Creation Flow', () => {
     await page.getByRole('link', { name: 'History' }).click();
     
     // Verify the newly created ticket appears in the history
-    await expect(page.getByText(randomTitle)).toBeVisible();
+    await expect(page.getByText(ticketData.subject)).toBeVisible();
   });
 }); 
