@@ -7,6 +7,10 @@
     "langchain/schema": "npm:langchain@0.0.147/schema",
     "langchain/prompts": "npm:langchain@0.0.147/prompts",
     "langchain/tools": "npm:langchain@0.0.147/tools",
+    "langchain/core/runnables": "npm:langchain@0.0.147/core/runnables",
+    "langchain/core/prompts": "npm:langchain@0.0.147/core/prompts",
+    "langchain/core/messages": "npm:langchain@0.0.147/core/messages",
+    "langchain/core/agents": "npm:langchain@0.0.147/core/agents",
     "zod": "npm:zod@3.22.4"
   },
   "tasks": {

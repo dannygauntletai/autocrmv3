@@ -14,6 +14,8 @@ import { MemoryManagementTool } from "../tools/memory.ts";
 import { SearchTool } from "../tools/search.ts";
 import { MessageTool } from "../tools/message.ts";
 import { TicketAnalyzer } from "./ticketAnalyzer.ts";
+import { FunctionsAgent } from "./functionsAgent.ts";
+import { BaseMessage, AIMessage, HumanMessage } from "langchain/schema";
 
 export interface SupportAgentConfig extends BaseToolConfig {
   openAiKey: string;
@@ -45,8 +47,13 @@ export class SupportAgent {
   private tools: Tool[];
   private model: ChatOpenAI;
   private ticketAnalyzer: TicketAnalyzer;
+  private functionsAgent!: FunctionsAgent;
+  private chatHistory: BaseMessage[] = [];
 
-  constructor(config: SupportAgentConfig) {
+  private constructor(
+    config: SupportAgentConfig,
+    functionsAgent: FunctionsAgent
+  ) {
     this.config = config;
     
     // Initialize tools
@@ -65,11 +72,30 @@ export class SupportAgent {
     this.model = new ChatOpenAI({
       openAIApiKey: config.openAiKey,
       modelName: config.model || "gpt-4-1106-preview",
-      temperature: config.temperature || 0.2, // Lower temperature for more deterministic responses
+      temperature: config.temperature || 0.2,
     });
 
     // Initialize YOLO mode analyzer
     this.ticketAnalyzer = new TicketAnalyzer(config);
+
+    // Set Functions Agent
+    this.functionsAgent = functionsAgent;
+  }
+
+  static async create(config: SupportAgentConfig): Promise<SupportAgent> {
+    const tools = [
+      new ReadTicketTool(config),
+      new UpdateTicketStatusTool(config),
+      new UpdateTicketPriorityTool(config),
+      new AssignTicketTool(config),
+      new AddInternalNoteTool(config),
+      new MemoryManagementTool(config.ticketId, config.supabaseUrl, config.supabaseKey),
+      new SearchTool(config.supabaseUrl, config.supabaseKey),
+      new MessageTool(config.ticketId, config.supabaseUrl, config.supabaseKey)
+    ];
+
+    const functionsAgent = await FunctionsAgent.create(config, tools);
+    return new SupportAgent(config, functionsAgent);
   }
 
   async processInput(userInput: string): Promise<AgentResult> {
@@ -88,137 +114,31 @@ export class SupportAgent {
         }
         messages.push("Initial analysis complete");
 
-        // Step 2: Create an executor with all tools for action phase
-        const executor = await initializeAgentExecutorWithOptions(this.tools, this.model, {
-          agentType: "openai-functions",
-          verbose: true,
-          returnIntermediateSteps: true,
-          callbacks: [{
-            handleLLMStart: async (llm: any, prompts: string[]) => {
-              messages.push("Starting action planning...");
-            },
-            handleToolStart: async (tool: any, input: string) => {
-              messages.push(`Executing action: ${tool.name} with input: ${input}`);
-            },
-            handleToolEnd: async (output: string) => {
-              try {
-                const result = JSON.parse(output);
-                messages.push(result.success ? 
-                  `Action completed: ${result.data ? JSON.stringify(result.data) : 'success'}` : 
-                  `Action failed: ${result.error}`
-                );
-              } catch {
-                messages.push("Action completed");
-              }
-            }
-          }]
-        });
+        // Step 2: Use Functions Agent to handle the analysis results
+        const result = await this.functionsAgent.processInput(
+          `Based on this ticket analysis, determine and execute appropriate actions: ${analysis.output}`,
+          this.chatHistory
+        );
 
-        // Step 3: Use analysis to determine and execute actions
-        const actionTask = `
-          Based on the following ticket analysis, determine and execute appropriate actions:
+        // Update chat history with the interaction
+        if (result.success && result.output) {
+          this.chatHistory.push(new HumanMessage(userInput));
+          this.chatHistory.push(new AIMessage(result.output));
+        }
 
-          Analysis Results:
-          ${analysis.output}
-
-          Available actions:
-          - read_ticket: Get ticket details
-          - update_ticket_status: Change ticket status
-          - update_ticket_priority: Change ticket priority
-          - assign_ticket: Assign to an employee
-          - add_internal_note: Add internal notes
-          - memory_management: Manage conversation context
-          - search: Search through ticket history
-          - message: Handle customer communication
-
-          For each action:
-          1. Explain why you're taking this action based on the analysis
-          2. Execute the action
-          3. Verify the result
-          4. Only proceed to the next action if the current one was successful
-        `;
-
-        messages.push("Executing actions based on analysis...");
-        const result = await executor.call({ input: actionTask });
-
-        return {
-          success: true,
-          output: messages.join("\n") + "\n\nFinal Response: " + result.output,
-          steps: result.intermediateSteps || [],
-          toolCalls: result.intermediateSteps?.map((step: AgentStep) => ({
-            tool: step.action.tool,
-            input: step.action.toolInput,
-            output: step.observation
-          })) || []
-        };
+        return result;
       }
 
-      messages.push("Creating agent executor for normal operation...");
-      // Create agent executor for normal operation
-      const executor = await initializeAgentExecutorWithOptions(this.tools, this.model, {
-        agentType: "openai-functions",
-        verbose: true,
-        returnIntermediateSteps: true,
-        callbacks: [{
-          handleLLMStart: async (llm: any, prompts: string[]) => {
-            messages.push("Starting analysis with AI model...");
-          },
-          handleToolStart: async (tool: any, input: string) => {
-            messages.push(`Using tool: ${tool.name} with input: ${input}`);
-          },
-          handleToolEnd: async (output: string) => {
-            try {
-              const result = JSON.parse(output);
-              if (result.success) {
-                messages.push("Tool execution successful");
-              } else {
-                messages.push(`Tool execution failed: ${result.error}`);
-              }
-            } catch {
-              messages.push("Tool execution completed");
-            }
-          }
-        }]
-      });
-
-      messages.push("Analyzing user request...");
-      // Define the task based on user input
-      const task = `
-        Support employee for ticket ${this.config.ticketId}. Instruction: "${userInput}"
-        
-        If general conversation: respond naturally.
-        If action request: use appropriate tool(s):
-        - read_ticket: Get ticket info
-        - update_ticket_status: Change status
-        - update_ticket_priority: Change priority
-        
-        Only use tools when explicitly requested. Ask for clarification if unclear.
-      `;
-
-      messages.push("Executing task...");
-      const result = await executor.call({ input: task });
-      messages.push("Task execution complete");
-
-      // Ensure we have a valid result
-      if (!result) {
-        throw new Error("No result returned from executor");
+      // For normal operations, use Functions Agent directly
+      const result = await this.functionsAgent.processInput(userInput, this.chatHistory);
+      
+      // Update chat history
+      if (result.success && result.output) {
+        this.chatHistory.push(new HumanMessage(userInput));
+        this.chatHistory.push(new AIMessage(result.output));
       }
 
-      // Handle the case where output might be undefined
-      const output = result.output || "I understood your message but I'm not sure how to respond. Could you please clarify what you'd like me to do?";
-
-      messages.push("Processing completed successfully");
-
-      return {
-        success: true,
-        output: messages.join("\n") + "\n\nResponse: " + output,
-        steps: result.intermediateSteps || [],
-        toolCalls: result.intermediateSteps?.map((step: AgentStep) => ({
-          tool: step.action.tool,
-          input: step.action.toolInput,
-          output: step.observation
-        })) || []
-      };
+      return result;
 
     } catch (error) {
       console.error("[SupportAgent] Error processing input:", error);

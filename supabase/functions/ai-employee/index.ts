@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
     
     // Initialize the support agent
     console.log("[AI-Employee] Initializing support agent...");
-    const agent = new SupportAgent({
+    const agent = await SupportAgent.create({
       ticketId,
       supabaseUrl,
       supabaseKey: supabaseAnonKey,
@@ -52,18 +52,6 @@ Deno.serve(async (req) => {
       openAiKey: openAIApiKey,
       model: 'gpt-4-turbo-preview',
       temperature: 0.7
-    });
-
-    // Initialize the ticket analyzer
-    console.log("[AI-Employee] Initializing ticket analyzer...");
-    const analyzer = new TicketAnalyzer({
-      ticketId,
-      aiEmployeeId: '00000000-0000-0000-0000-000000000000',
-      supabaseUrl: Deno.env.get("SUPABASE_URL") || "",
-      supabaseKey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
-      openAiKey: Deno.env.get("OPENAI_API_KEY") || "",
-      langSmithApiKey: Deno.env.get("LANGCHAIN_API_KEY"),
-      langSmithProjectName: "autocrm-yolo"
     });
 
     // Process the user input
