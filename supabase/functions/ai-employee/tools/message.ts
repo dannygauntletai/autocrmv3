@@ -29,8 +29,21 @@ For analyzing messages, use 'analyze MESSAGE'.`;
   /** @ignore */
   async _call(input: string): Promise<string> {
     try {
-      const [action, messageType, ...contentParts] = input.trim().split(' ');
+      // Handle case where input is passed as an object
+      let actualInput = input;
+      try {
+        const parsed = JSON.parse(input);
+        if (parsed.input) {
+          actualInput = parsed.input;
+        }
+      } catch {
+        // Input is already a string, use as is
+      }
+
+      const [action, messageType, ...contentParts] = actualInput.trim().split(' ');
       const content = contentParts.join(' ');
+
+      console.log("[MessageTool] Processing:", { action, messageType, contentLength: content?.length });
 
       if (action === 'send' || action === 'generate') {
         if (messageType !== 'customer' && messageType !== 'internal') {
@@ -38,9 +51,15 @@ For analyzing messages, use 'analyze MESSAGE'.`;
         }
         
         if (action === 'send') {
-          return JSON.stringify(await this.sendMessage(messageType as 'customer' | 'internal', content));
+          console.log("[MessageTool] Sending message:", { type: messageType, contentLength: content?.length });
+          const result = await this.sendMessage(messageType as 'customer' | 'internal', content);
+          console.log("[MessageTool] Send result:", result);
+          return JSON.stringify(result);
         } else {
-          return JSON.stringify(await this.generateResponse(messageType as 'customer' | 'internal', content));
+          console.log("[MessageTool] Generating response:", { type: messageType, context: content });
+          const result = await this.generateResponse(messageType as 'customer' | 'internal', content);
+          console.log("[MessageTool] Generate result:", result);
+          return JSON.stringify(result);
         }
       }
 
@@ -50,46 +69,92 @@ For analyzing messages, use 'analyze MESSAGE'.`;
 
       throw new Error(`Unknown action: ${action}. Use 'send', 'generate', or 'analyze'.`);
     } catch (error) {
-      if (error instanceof Error) {
-        return JSON.stringify({
-          success: false,
-          error: error.message
-        });
-      }
+      console.error("[MessageTool] Error:", error);
       return JSON.stringify({
         success: false,
-        error: "An unknown error occurred"
+        error: error instanceof Error ? error.message : "An unknown error occurred",
+        context: {
+          ticketId: this.ticketId,
+          timestamp: Date.now(),
+          error: error instanceof Error ? {
+            name: error.name,
+            message: error.message,
+            stack: error.stack
+          } : 'Unknown error'
+        }
       });
     }
   }
 
   private async sendMessage(type: 'customer' | 'internal', content: string): Promise<ToolResult> {
-    const { data, error } = await this.supabase
-      .from('messages')
-      .insert({
-        ticket_id: this.ticketId,
-        content,
-        type,
-        sender: 'ai_employee'
-      })
-      .select()
-      .single();
+    try {
+      console.log("[MessageTool] Preparing to send message:", { type, contentLength: content?.length });
 
-    if (error) throw error;
-
-    return {
-      success: true,
-      data,
-      context: {
-        ticketId: this.ticketId,
-        userId: 'ai_employee',
-        timestamp: Date.now(),
-        metadata: {
-          messageType: type,
-          messageId: data.id
-        }
+      if (!content || content.trim().length === 0) {
+        throw new Error("Message content cannot be empty");
       }
-    };
+
+      // Add the message to ticket_messages
+      const { data: message, error: messageError } = await this.supabase
+        .from('ticket_messages')
+        .insert({
+          ticket_id: this.ticketId,
+          message_body: content.trim(),
+          sender_type: 'system',
+          sender_id: '00000000-0000-0000-0000-000000000000',
+          is_internal: type === 'internal',
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (messageError) {
+        console.error("[MessageTool] Error inserting message:", messageError);
+        throw messageError;
+      }
+
+      console.log("[MessageTool] Message inserted:", message);
+
+      // Add to ticket history
+      const { error: historyError } = await this.supabase
+        .from('ticket_history')
+        .insert({
+          ticket_id: this.ticketId,
+          changed_by: '00000000-0000-0000-0000-000000000000',
+          changes: {
+            type: type === 'internal' ? 'internal_note' : 'customer_message',
+            message: {
+              id: message.id,
+              content: content.trim()
+            }
+          },
+          created_at: new Date().toISOString()
+        });
+
+      if (historyError) {
+        console.error("[MessageTool] Error inserting history:", historyError);
+        throw historyError;
+      }
+
+      console.log("[MessageTool] History added successfully");
+
+      return {
+        success: true,
+        data: message,
+        context: {
+          ticketId: this.ticketId,
+          userId: 'ai_employee',
+          timestamp: Date.now(),
+          metadata: {
+            messageType: type,
+            messageId: message.id
+          }
+        }
+      };
+    } catch (error) {
+      console.error("[MessageTool] Error in sendMessage:", error);
+      throw error; // Let the _call method handle the error formatting
+    }
   }
 
   private async generateResponse(type: 'customer' | 'internal', context: string): Promise<ToolResult> {
