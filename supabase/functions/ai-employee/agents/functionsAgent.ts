@@ -83,7 +83,7 @@ export class FunctionsAgent {
       agentType: "openai-functions",
       verbose: true,
       returnIntermediateSteps: true,
-      maxIterations: 5,
+      maxIterations: 10,
     });
 
     return new FunctionsAgent(config, tools, executor);
@@ -98,7 +98,11 @@ export class FunctionsAgent {
 
       return {
         success: true,
-        output: result.output,
+        output: result.output + (result.output.includes('max iterations') ? 
+          '\n\nPartial actions completed before max iterations:\n' + 
+          result.intermediateSteps?.map((step: AgentStep) => 
+            `- Tool: ${step.action.tool}\n  Input: ${step.action.toolInput}\n  Result: ${step.observation}`
+          ).join('\n') : ''),
         steps: result.intermediateSteps,
         toolCalls: result.intermediateSteps?.map((step: AgentStep) => ({
           tool: step.action.tool,
@@ -111,6 +115,29 @@ export class FunctionsAgent {
         },
       };
     } catch (error) {
+      // Check if error is due to max iterations and include partial results
+      const isMaxIterations = error instanceof Error && error.message.includes('max iterations');
+      const steps = (this.executor as any).intermediateSteps as AgentStep[] | undefined;
+      if (isMaxIterations && steps?.length) {
+        return {
+          success: true,
+          output: "Reached maximum iterations. Here are the actions completed:\n" +
+            steps.map((step: AgentStep) => 
+              `- Tool: ${step.action.tool}\n  Input: ${step.action.toolInput}\n  Result: ${step.observation}`
+            ).join('\n'),
+          steps: steps,
+          toolCalls: steps.map((step: AgentStep) => ({
+            tool: step.action.tool,
+            input: step.action.toolInput,
+            output: step.observation,
+          })),
+          context: {
+            ticketId: this.config.ticketId,
+            timestamp: Date.now(),
+          },
+        };
+      }
+
       console.error("[FunctionsAgent] Error processing input:", error);
       return {
         success: false,

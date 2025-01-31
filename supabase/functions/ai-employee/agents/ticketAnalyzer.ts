@@ -90,7 +90,7 @@ export class TicketAnalyzer {
       const executor = await initializeAgentExecutorWithOptions([this.tools[0]], this.model, {
         agentType: "openai-functions",
         verbose: true,
-        maxIterations: 1,
+        maxIterations: 10,
         returnIntermediateSteps: true
       });
 
@@ -120,9 +120,18 @@ export class TicketAnalyzer {
         actionPlan = JSON.parse(analysis.output);
       } catch (e) {
         messages.push("Failed to parse analysis output, using raw output");
+        // Check if error is due to max iterations
+        const isMaxIterations = analysis.output.includes('max iterations');
         actionPlan = {
-          reasoning: "Failed to structure analysis",
-          actions: []
+          reasoning: isMaxIterations ? 
+            "Analysis stopped due to max iterations. Here are the partial results:" : 
+            "Failed to structure analysis",
+          actions: isMaxIterations ? 
+            analysis.intermediateSteps?.map((step: AgentStep) => ({
+              tool: step.action.tool,
+              reason: "Action from partial analysis",
+              input: step.action.toolInput
+            })) || [] : []
         };
       }
 
