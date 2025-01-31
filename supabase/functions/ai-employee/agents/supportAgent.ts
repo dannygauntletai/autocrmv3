@@ -79,8 +79,78 @@ export class SupportAgent {
 
       // Check for YOLO mode
       if (userInput.toLowerCase().includes('yolo')) {
-        messages.push("YOLO mode activated - transferring control to autonomous analyzer");
-        return this.ticketAnalyzer.analyze();
+        messages.push("YOLO mode activated - implementing reason + act structure");
+        
+        // Step 1: Analyze the ticket first
+        const analysis = await this.ticketAnalyzer.analyze();
+        if (!analysis.success) {
+          throw new Error("Failed to analyze ticket: " + analysis.error);
+        }
+        messages.push("Initial analysis complete");
+
+        // Step 2: Create an executor with all tools for action phase
+        const executor = await initializeAgentExecutorWithOptions(this.tools, this.model, {
+          agentType: "openai-functions",
+          verbose: true,
+          returnIntermediateSteps: true,
+          callbacks: [{
+            handleLLMStart: async (llm: any, prompts: string[]) => {
+              messages.push("Starting action planning...");
+            },
+            handleToolStart: async (tool: any, input: string) => {
+              messages.push(`Executing action: ${tool.name} with input: ${input}`);
+            },
+            handleToolEnd: async (output: string) => {
+              try {
+                const result = JSON.parse(output);
+                messages.push(result.success ? 
+                  `Action completed: ${result.data ? JSON.stringify(result.data) : 'success'}` : 
+                  `Action failed: ${result.error}`
+                );
+              } catch {
+                messages.push("Action completed");
+              }
+            }
+          }]
+        });
+
+        // Step 3: Use analysis to determine and execute actions
+        const actionTask = `
+          Based on the following ticket analysis, determine and execute appropriate actions:
+
+          Analysis Results:
+          ${analysis.output}
+
+          Available actions:
+          - read_ticket: Get ticket details
+          - update_ticket_status: Change ticket status
+          - update_ticket_priority: Change ticket priority
+          - assign_ticket: Assign to an employee
+          - add_internal_note: Add internal notes
+          - memory_management: Manage conversation context
+          - search: Search through ticket history
+          - message: Handle customer communication
+
+          For each action:
+          1. Explain why you're taking this action based on the analysis
+          2. Execute the action
+          3. Verify the result
+          4. Only proceed to the next action if the current one was successful
+        `;
+
+        messages.push("Executing actions based on analysis...");
+        const result = await executor.call({ input: actionTask });
+
+        return {
+          success: true,
+          output: messages.join("\n") + "\n\nFinal Response: " + result.output,
+          steps: result.intermediateSteps || [],
+          toolCalls: result.intermediateSteps?.map((step: AgentStep) => ({
+            tool: step.action.tool,
+            input: step.action.toolInput,
+            output: step.observation
+          })) || []
+        };
       }
 
       messages.push("Creating agent executor for normal operation...");
@@ -88,7 +158,6 @@ export class SupportAgent {
       const executor = await initializeAgentExecutorWithOptions(this.tools, this.model, {
         agentType: "openai-functions",
         verbose: true,
-        maxIterations: 3,
         returnIntermediateSteps: true,
         callbacks: [{
           handleLLMStart: async (llm: any, prompts: string[]) => {

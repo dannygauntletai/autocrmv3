@@ -67,182 +67,113 @@ export class TicketAnalyzer {
       const messages: string[] = [];
       messages.push("Starting autonomous analysis for ticket: " + this.config.ticketId);
       
-      // First, get all necessary data in parallel
-      messages.push("Gathering ticket and employee data...");
-      const [ticketData, employeesResponse] = await Promise.all([
-        this.readTicket(),
-        this.supabase
-          .from('employees')
-          .select(`
-            id,
-            name,
-            role,
-            employee_metrics (
-              assigned_tickets_count,
-              closed_tickets_count,
-              avg_first_response_time,
-              avg_resolution_time
-            ),
-            employee_skills!left (
-              skills
-            )
-          `)
-          .eq('status', 'active')
-      ]);
+      // Step 1: Gather ticket data for analysis
+      messages.push("Gathering ticket data for analysis...");
+      const ticketData = await this.readTicket();
       
       if (!ticketData.success || !ticketData.data?.ticket) {
         throw new Error(`Failed to read ticket data for analysis. Ticket ID: ${this.config.ticketId}`);
       }
 
-      messages.push("Successfully retrieved ticket data and employee information");
+      messages.push("Successfully retrieved ticket data");
 
-      // Format employee data to include skills
-      const employeesWithSkills = employeesResponse.data?.map(emp => ({
-        ...emp,
-        skills: emp.employee_skills?.[0]?.skills || {},
-        metrics: emp.employee_metrics?.[0] || null
-      }));
-
-      messages.push("Analyzing ticket with available employee data...");
-
-      // Create a single agent executor for all operations
-      const executor = await initializeAgentExecutorWithOptions(this.tools, this.model, {
+      // Step 2: Analyze the ticket and determine required actions
+      messages.push("Analyzing ticket to determine required actions...");
+      const executor = await initializeAgentExecutorWithOptions([this.tools[0]], this.model, {
         agentType: "openai-functions",
         verbose: true,
-        maxIterations: 5,
-        returnIntermediateSteps: true,
-        callbacks: [{
-          handleLLMStart: async (llm: any, prompts: string[]) => {
-            messages.push("Starting analysis with AI model...");
-          },
-          handleToolStart: async (tool: any, input: string) => {
-            messages.push(`Using tool: ${tool.name} with input: ${input}`);
-          },
-          handleToolEnd: async (output: string) => {
-            try {
-              const result = JSON.parse(output);
-              if (result.success) {
-                messages.push("Tool execution successful");
-              } else {
-                messages.push(`Tool execution failed: ${result.error}`);
-              }
-            } catch {
-              messages.push("Tool execution completed");
-            }
-          }
-        }]
+        maxIterations: 1,
+        returnIntermediateSteps: true
       });
 
-      // Batch all analysis and actions into a single call
-      messages.push("Executing comprehensive ticket analysis...");
-      const analysisResult = await executor.call({
-        input: `YOLO mode for ticket ${this.config.ticketId}.
-               Ticket: ${JSON.stringify(ticketData.data)}
-               Employees: ${JSON.stringify(employeesWithSkills)}
-               
-               Take necessary actions:
-               1. Assess and update status/priority if needed
-               2. Assign/reassign (format: {"employee_id": "id", "reason": "reason"})
-               3. Add internal notes for decisions
-               4. Add customer communication if needed
-               
-               Make all decisions in one execution. Document reasoning in notes.`
-      });
+      const analysisTask = `
+        Analyze this ticket and determine what actions need to be taken. Consider:
+        1. Ticket priority based on content and customer impact
+        2. Required skills and expertise for resolution
+        3. Current status and if it needs updating
+        4. Whether it needs reassignment
 
-      messages.push("Analysis complete. Processing results...");
-
-      // Add analysis results to messages
-      if (analysisResult.intermediateSteps) {
-        messages.push("\nActions taken:");
-        analysisResult.intermediateSteps.forEach((step: AgentStep) => {
-          const action = step.action;
-          const observation = step.observation;
-          
-          try {
-            // Try to parse the observation as JSON for better formatting
-            const parsedObservation = JSON.parse(observation);
-            if (parsedObservation.success) {
-              messages.push(`✓ ${action.tool}: ${action.toolInput}`);
-              if (parsedObservation.data) {
-                const data = parsedObservation.data;
-                switch (action.tool) {
-                  case 'update_ticket_status':
-                    messages.push(`  → Status updated to: ${data.status}`);
-                    break;
-                  case 'update_ticket_priority':
-                    messages.push(`  → Priority updated to: ${data.priority}`);
-                    break;
-                  case 'assign_ticket':
-                    messages.push(`  → Assigned to: ${data.employee?.name || data.employee_id}`);
-                    break;
-                  case 'add_internal_note':
-                    messages.push(`  → Added internal note`);
-                    break;
-                }
-              }
-            } else {
-              messages.push(`✗ ${action.tool} failed: ${parsedObservation.error}`);
+        Provide your analysis in a structured format:
+        {
+          "reasoning": "explanation of your analysis",
+          "actions": [
+            {
+              "tool": "name of the tool to use",
+              "reason": "why this action is needed",
+              "input": "what input to provide to the tool"
             }
-          } catch {
-            // If not JSON, just show the raw action
-            messages.push(`• ${action.tool}: ${action.toolInput}`);
-          }
-        });
+          ]
+        }
+      `;
+
+      const analysis = await executor.call({ input: analysisTask });
+      let actionPlan;
+      try {
+        actionPlan = JSON.parse(analysis.output);
+      } catch (e) {
+        messages.push("Failed to parse analysis output, using raw output");
+        actionPlan = {
+          reasoning: "Failed to structure analysis",
+          actions: []
+        };
       }
 
-      // If customer communication is needed, handle it
-      if (analysisResult.output.toLowerCase().includes('message') || 
-          analysisResult.output.toLowerCase().includes('respond')) {
-        messages.push("Generating customer response...");
-        const response = await fetch(`${this.config.supabaseUrl}/functions/v1/generate-response`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.config.supabaseKey}`
-          },
-          body: JSON.stringify({
-            ticketId: this.config.ticketId,
-            context: {
-              ticket: ticketData.data.ticket,
-              timeline: ticketData.data.timeline,
-              stats: ticketData.data.stats,
-              analysis: analysisResult.output
-            }
-          })
-        });
+      messages.push("Analysis complete. Reasoning: " + actionPlan.reasoning);
 
-        if (response.ok) {
-          const messageResult = await response.json();
-          if (messageResult.response) {
-            await this.addMessage(messageResult.response, false);
-            messages.push("Customer response sent successfully");
-          }
-        } else {
-          messages.push("Failed to generate customer response");
+      // Step 3: Execute the determined actions
+      messages.push("Executing determined actions...");
+      const toolResults = [];
+      
+      for (const action of actionPlan.actions) {
+        const tool = this.tools.find(t => t.name === action.tool);
+        if (!tool) {
+          messages.push(`Warning: Tool ${action.tool} not found, skipping action`);
+          continue;
+        }
+
+        messages.push(`Executing action: ${action.tool} - ${action.reason}`);
+        try {
+          const result = await tool.call(action.input);
+          toolResults.push({
+            tool: action.tool,
+            input: action.input,
+            output: result,
+            reason: action.reason
+          });
+          messages.push(`Action completed successfully`);
+        } catch (error) {
+          messages.push(`Failed to execute action: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
       }
 
-      messages.push("YOLO mode analysis completed successfully");
+      // Step 4: Summarize actions taken
+      const summary = `
+        Analysis complete for ticket ${this.config.ticketId}
+        
+        Reasoning:
+        ${actionPlan.reasoning}
+        
+        Actions Taken:
+        ${toolResults.map(result => 
+          `- ${result.tool}: ${result.reason}\n  Result: ${result.output}`
+        ).join('\n')}
+      `;
 
       return {
         success: true,
-        output: messages.join("\n"),
-        steps: analysisResult.intermediateSteps,
-        toolCalls: analysisResult.intermediateSteps?.map((step: AgentStep) => ({
-          tool: step.action.tool,
-          input: step.action.toolInput,
-          output: step.observation
-        })),
+        output: summary,
+        toolCalls: toolResults,
         context: {
           ticketId: this.config.ticketId,
           timestamp: Date.now()
         }
       };
+
     } catch (error) {
       console.error("[TicketAnalyzer] Error during analysis:", error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : "An unknown error occurred",
         context: {
           ticketId: this.config.ticketId,
           timestamp: Date.now()
