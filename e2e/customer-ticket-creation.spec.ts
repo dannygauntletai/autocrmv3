@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { generateTicketData } from './test-helpers';
+import { generateTicketData, generateSpecificTicketData } from './test-helpers';
 
 test.describe('Customer Ticket Creation Flow', () => {
   test('should create a new ticket as a guest customer', async ({ page }) => {
@@ -41,6 +41,90 @@ test.describe('Customer Ticket Creation Flow', () => {
     await page.getByRole('link', { name: 'History' }).click();
     
     // Verify the newly created ticket appears in the history
+    await expect(page.getByText(ticketData.subject)).toBeVisible();
+  });
+
+  test('should handle production system outage report', async ({ page }) => {
+    const ticketData = await generateSpecificTicketData('productionIssue');
+    
+    await page.goto('/');
+    await page.getByRole('link', { name: /customer login/i }).click();
+    await page.getByRole('button', { name: /continue as guest/i }).click();
+    await expect(page).toHaveURL(/.*customer/);
+    
+    await page.getByRole('link', { name: 'New Ticket' }).click();
+    await page.getByLabel('Subject').fill(ticketData.subject);
+    await page.getByLabel('Description').fill(ticketData.description);
+    await page.getByLabel('Category').selectOption(ticketData.category);
+    await page.getByLabel('Priority').selectOption(ticketData.priority);
+    
+    await page.getByRole('button', { name: /create/i }).click();
+    await expect(page).toHaveURL(/.*customer/);
+    
+    await page.getByRole('link', { name: 'History' }).click();
+    await expect(page.getByText(ticketData.subject)).toBeVisible();
+  });
+
+  test('should handle feature exploration request', async ({ page }) => {
+    const ticketData = await generateSpecificTicketData('featureExploration');
+    
+    await page.goto('/');
+    await page.getByRole('link', { name: /customer login/i }).click();
+    await page.getByRole('button', { name: /continue as guest/i }).click();
+    await expect(page).toHaveURL(/.*customer/);
+    
+    await page.getByRole('link', { name: 'New Ticket' }).click();
+    await page.getByLabel('Subject').fill(ticketData.subject);
+    await page.getByLabel('Description').fill(ticketData.description);
+    await page.getByLabel('Category').selectOption(ticketData.category);
+    await page.getByLabel('Priority').selectOption(ticketData.priority);
+    
+    await page.getByRole('button', { name: /create/i }).click();
+    await expect(page).toHaveURL(/.*customer/);
+    
+    await page.getByRole('link', { name: 'History' }).click();
+    await expect(page.getByText(ticketData.subject)).toBeVisible();
+  });
+
+  test('should handle security vulnerability report', async ({ page }) => {
+    const ticketData = await generateSpecificTicketData('securityReport');
+    
+    await page.goto('/');
+    await page.getByRole('link', { name: /customer login/i }).click();
+    await page.getByRole('button', { name: /continue as guest/i }).click();
+    await expect(page).toHaveURL(/.*customer/);
+    
+    await page.getByRole('link', { name: 'New Ticket' }).click();
+    await page.getByLabel('Subject').fill(ticketData.subject);
+    await page.getByLabel('Description').fill(ticketData.description);
+    await page.getByLabel('Category').selectOption(ticketData.category);
+    await page.getByLabel('Priority').selectOption(ticketData.priority);
+    
+    await page.getByRole('button', { name: /create/i }).click();
+    await expect(page).toHaveURL(/.*customer/);
+    
+    await page.getByRole('link', { name: 'History' }).click();
+    await expect(page.getByText(ticketData.subject)).toBeVisible();
+  });
+
+  test('should handle documentation clarification request', async ({ page }) => {
+    const ticketData = await generateSpecificTicketData('documentationQuery');
+    
+    await page.goto('/');
+    await page.getByRole('link', { name: /customer login/i }).click();
+    await page.getByRole('button', { name: /continue as guest/i }).click();
+    await expect(page).toHaveURL(/.*customer/);
+    
+    await page.getByRole('link', { name: 'New Ticket' }).click();
+    await page.getByLabel('Subject').fill(ticketData.subject);
+    await page.getByLabel('Description').fill(ticketData.description);
+    await page.getByLabel('Category').selectOption(ticketData.category);
+    await page.getByLabel('Priority').selectOption(ticketData.priority);
+    
+    await page.getByRole('button', { name: /create/i }).click();
+    await expect(page).toHaveURL(/.*customer/);
+    
+    await page.getByRole('link', { name: 'History' }).click();
     await expect(page.getByText(ticketData.subject)).toBeVisible();
   });
 }); 

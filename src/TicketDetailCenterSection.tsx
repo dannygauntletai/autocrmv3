@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Clock, ChevronDown, BookPlus } from "lucide-react";
+import { ArrowLeft, Clock, ChevronDown, BookPlus, Copy, Check } from "lucide-react";
 import { InteractionLog } from "./InteractionLog";
 import { RichTextEditor } from "./RichTextEditor";
 import { useTicket } from "./hooks/useTicket";
@@ -27,6 +27,7 @@ export const TicketDetailCenterSection = ({
   const [showKbConfirmation, setShowKbConfirmation] = useState(false);
   const [addingToKb, setAddingToKb] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -142,6 +143,16 @@ export const TicketDetailCenterSection = ({
     }
   };
 
+  const handleCopyTicketId = async () => {
+    try {
+      await navigator.clipboard.writeText(ticketId);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000); // Reset after 2 seconds
+    } catch (err) {
+      console.error('Failed to copy ticket ID:', err);
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col bg-white border border-gray-200 rounded-lg max-h-screen overflow-hidden">
       {/* Header Section */}
@@ -155,7 +166,17 @@ export const TicketDetailCenterSection = ({
               {ticket.title}
             </h1>
             <div className="mt-1 flex items-center gap-2 text-sm text-gray-500">
-              <span className="truncate">Ticket #{ticketId}</span>
+              <button
+                onClick={handleCopyTicketId}
+                className="inline-flex items-center gap-1 hover:text-blue-600 focus:outline-none focus:text-blue-600 transition-colors"
+              >
+                <span className="truncate">Ticket #{ticketId}</span>
+                {copied ? (
+                  <Check className="h-4 w-4 text-green-500" />
+                ) : (
+                  <Copy className="h-4 w-4 opacity-0 group-hover:opacity-100" />
+                )}
+              </button>
               <span className="flex-shrink-0">•</span>
               <Clock className="h-4 w-4 flex-shrink-0" />
               <span className="truncate">Created {new Date(ticket.created_at).toLocaleDateString()}</span>
