@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Route, Routes, Link, Navigate, useLocation } from "react-router-dom";
-import { Layout, Database, ClipboardList, FileText, InboxIcon, LayoutDashboard, MessageSquare, Users, GitBranch, Award, Scale, LogOut, FileUp, Bot, Camera } from "lucide-react";
+import { Layout, Database, ClipboardList, FileText, InboxIcon, LayoutDashboard, MessageSquare, Users, Award, LogOut, FileUp, Bot, Camera } from "lucide-react";
 import { SchemaDefinitionsManager } from "./SchemaDefinitionsManager";
 import { AuditLogViewer } from "./AuditLogViewer";
 import { CreateTicketForm } from "./CreateTicketForm";
@@ -9,9 +9,7 @@ import { TicketDetailThread } from "./TicketDetailThread";
 import { AgentDashboard } from "./AgentDashboard";
 import { TemplateManagementPanel } from "./TemplateManagementPanel";
 import { TeamManagementConsole } from "./TeamManagementConsole";
-import { RoutingRuleList } from "./RoutingRuleList";
 import { SkillsetsPanel } from "./SkillsetsPanel";
-import { LoadBalancingSettings } from "./LoadBalancingSettings";
 import { TeamAdminPanel } from "./TeamAdminPanel";
 import { useAuth } from './hooks/useAuth';
 import { useEmployeeRole } from './hooks/useEmployeeRole';
@@ -112,10 +110,6 @@ export const DataManagementAdminPanel = () => {
                     <Award className="h-5 w-5" />
                     Skillsets
                   </NavLink>
-                  <NavLink to="/load-balancing">
-                    <Scale className="h-5 w-5" />
-                    Load Balancing
-                  </NavLink>
                 </div>
               </div>
             )}
@@ -130,10 +124,6 @@ export const DataManagementAdminPanel = () => {
                   <NavLink to="/admin/teams">
                     <Users className="h-5 w-5" />
                     Teams
-                  </NavLink>
-                  <NavLink to="/routing">
-                    <GitBranch className="h-5 w-5" />
-                    Routing Rules
                   </NavLink>
                   <NavLink to="/schema">
                     <Database className="h-5 w-5" />
@@ -192,7 +182,6 @@ export const DataManagementAdminPanel = () => {
                 <Route path="/team" element={<TeamManagementConsole />} />
                 <Route path="/team-documents" element={<TeamDocumentsPanel />} />
                 <Route path="/skills" element={<SkillsetsPanel />} />
-                <Route path="/load-balancing" element={<LoadBalancingSettings />} />
               </>
             )}
 
@@ -200,7 +189,6 @@ export const DataManagementAdminPanel = () => {
             {isAdmin && (
               <>
                 <Route path="/admin/teams" element={<TeamAdminPanel />} />
-                <Route path="/routing" element={<RoutingRuleList />} />
                 <Route path="/schema" element={<SchemaDefinitionsManager />} />
                 <Route path="/audit" element={<AuditLogViewer />} />
                 <Route path="/create-ticket" element={<CreateTicketForm />} />

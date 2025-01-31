@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, Book, ArrowRight } from "lucide-react";
+import { Book, ArrowRight } from "lucide-react";
 import { supabase } from '../lib/supabaseClient';
 import ReactMarkdown from 'react-markdown';
 
@@ -22,7 +22,6 @@ interface Category {
 
 export const KnowledgeBase = () => {
   const [categories, setCategories] = useState<Category[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [selectedArticle, setSelectedArticle] = useState<KBArticle | null>(null);
 
@@ -71,57 +70,6 @@ export const KnowledgeBase = () => {
     }
   };
 
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) {
-      loadArticles();
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const { data: articles, error } = await supabase.rpc(
-        'search_kb_articles',
-        { search_query: searchQuery }
-      );
-
-      if (error) throw error;
-
-      // Group articles by category
-      const articlesByCategory = new Map<string, KBArticle[]>();
-      
-      for (const article of articles) {
-        const { data: category } = await supabase
-          .from('kb_categories')
-          .select('id, name')
-          .eq('id', article.category_id)
-          .single();
-        
-        if (category) {
-          if (!articlesByCategory.has(category.id)) {
-            articlesByCategory.set(category.id, []);
-          }
-          articlesByCategory.get(category.id)?.push({
-            ...article,
-            category
-          });
-        }
-      }
-
-      // Transform into categories array
-      const searchResults = Array.from(articlesByCategory.entries()).map(([id, articles]) => ({
-        id,
-        name: articles[0].category.name,
-        articles
-      }));
-
-      setCategories(searchResults);
-    } catch (error) {
-      console.error('Error searching articles:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="space-y-6">
       <div>
@@ -129,18 +77,6 @@ export const KnowledgeBase = () => {
         <p className="mt-1 text-sm text-gray-500">
           Find answers to common questions and learn how to use our platform
         </p>
-      </div>
-      
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-          placeholder="Search articles..."
-          className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg"
-        />
       </div>
 
       {loading ? (
