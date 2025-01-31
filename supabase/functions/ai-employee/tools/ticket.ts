@@ -2,6 +2,7 @@ import { Tool } from 'langchain/tools';
 import { createClient } from '@supabase/supabase-js';
 import { ToolResult } from '../types.ts';
 import { z } from "zod";
+import { TicketAssignmentTool } from './assignment.ts';
 
 interface TicketMessage {
   id: string;
@@ -30,17 +31,19 @@ interface TimelineItem {
 
 export class TicketManagementTool extends Tool {
   name = "ticket_management";
-  description = `Manage ticket operations including reading details, updating status/priority, and adding comments. 
+  description = `Manage ticket operations including reading details, updating status/priority, adding comments, and assigning tickets. 
 For reading ticket details, use 'read'.
 For updating ticket details, use 'update' followed by the status or priority.
 For adding comments, use 'comment' followed by your message.
-For analyzing the ticket (YOLO mode), use 'analyze'.`;
+For analyzing the ticket (YOLO mode), use 'analyze'.
+For assigning tickets, use 'assign' followed by the agent's email.`;
   
   private ticketId: string;
   private supabaseUrl: string;
   private supabaseKey: string;
   private supabase;
   private aiEmployeeId = '00000000-0000-0000-0000-000000000000'; // Default AI employee UUID
+  private assignmentTool: TicketAssignmentTool;
 
   constructor(
     ticketId: string,
@@ -56,6 +59,12 @@ For analyzing the ticket (YOLO mode), use 'analyze'.`;
     if (aiEmployeeId) {
       this.aiEmployeeId = aiEmployeeId;
     }
+    this.assignmentTool = new TicketAssignmentTool(
+      ticketId,
+      supabaseUrl,
+      supabaseKey,
+      this.aiEmployeeId
+    );
   }
 
   /** @ignore */
@@ -96,8 +105,12 @@ For analyzing the ticket (YOLO mode), use 'analyze'.`;
             return value;
           });
           break;
+        case 'assign':
+          console.log("[TicketManagementTool] Delegating assignment to TicketAssignmentTool");
+          result = await this.assignmentTool._call(args.join(' '));
+          break;
         default:
-          throw new Error(`Unknown action: ${action}. Use 'read', 'update', 'comment', or 'analyze'.`);
+          throw new Error(`Unknown action: ${action}. Use 'read', 'update', 'comment', 'analyze', or 'assign'.`);
       }
       return result;
     } catch (error) {

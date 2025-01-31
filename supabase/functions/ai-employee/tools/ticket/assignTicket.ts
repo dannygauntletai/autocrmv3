@@ -2,20 +2,23 @@ import { Tool } from 'langchain/tools';
 import { z } from 'zod';
 import { BaseToolConfig, TicketToolResult } from './types.ts';
 import type { Database } from '../../../../../types/database.types';
+import { createClient } from '@supabase/supabase-js';
 
 type TicketAssignment = Database['public']['Tables']['ticket_assignments']['Insert'];
 
 export class AssignTicketTool extends Tool {
   name = "assign_ticket";
-  description = "Assign a ticket to an employee. Input should be the employee_id (UUID) or a JSON string containing employee_id field.";
+  description = "Assign a ticket to an employee. Input should be the employee_id (UUID) or email address.";
   
   override returnDirect = false;
   
   private config: BaseToolConfig;
+  private supabase;
 
   constructor(config: BaseToolConfig) {
     super();
     this.config = config;
+    this.supabase = createClient(config.supabaseUrl, config.supabaseKey);
   }
 
   /** @ignore */
@@ -23,24 +26,42 @@ export class AssignTicketTool extends Tool {
     try {
       console.log("[AssignTicketTool] Received input:", input);
       
-      // Get the employee ID from input
-      let employeeId: string;
+      // Get the employee ID or email from input
+      let employeeIdOrEmail: string;
       try {
         const parsed = JSON.parse(typeof input === 'string' ? input : input.input);
-        employeeId = parsed.employee_id;
+        employeeIdOrEmail = parsed.employee_id;
       } catch {
         // If not JSON, use the raw input
-        employeeId = (typeof input === 'string' ? input : input.input).trim();
+        employeeIdOrEmail = (typeof input === 'string' ? input : input.input).trim();
       }
       
-      console.log("[AssignTicketTool] Using employee ID:", employeeId);
+      console.log("[AssignTicketTool] Using employee ID or email:", employeeIdOrEmail);
       
-      if (!employeeId?.trim()) {
-        throw new Error("Employee ID is required");
+      if (!employeeIdOrEmail?.trim()) {
+        throw new Error("Employee ID or email is required");
       }
 
       if (!this.config.ticketId) {
         throw new Error("Ticket ID is required but not provided in tool configuration");
+      }
+
+      // If input looks like an email, look up the employee ID
+      let employeeId = employeeIdOrEmail;
+      if (employeeIdOrEmail.includes('@')) {
+        console.log("[AssignTicketTool] Input appears to be an email, looking up employee ID");
+        const { data: employee, error: employeeError } = await this.supabase
+          .from('employees')
+          .select('id')
+          .eq('email', employeeIdOrEmail.toLowerCase().trim())
+          .single();
+
+        if (employeeError || !employee) {
+          console.error("[AssignTicketTool] Employee lookup failed:", employeeError);
+          throw new Error(`Employee not found with email: ${employeeIdOrEmail}`);
+        }
+        employeeId = employee.id;
+        console.log("[AssignTicketTool] Found employee ID:", employeeId);
       }
 
       console.log("[AssignTicketTool] Assigning ticket to employee:", employeeId);
@@ -72,43 +93,54 @@ export class AssignTicketTool extends Tool {
   }
 
   private async assignTicket(employeeId: string): Promise<TicketToolResult> {
-    const assignment: TicketAssignment = {
-      ticket_id: this.config.ticketId,
-      employee_id: employeeId,
-      assigned_at: new Date().toISOString()
-    };
+    try {
+      // First unassign any current assignments
+      console.log("[AssignTicketTool] Unassigning current assignments");
+      const { error: unassignError } = await this.supabase
+        .from('employee_ticket_assignments')
+        .update({ unassigned_at: new Date().toISOString() })
+        .eq('ticket_id', this.config.ticketId)
+        .is('unassigned_at', null);
 
-    const response = await fetch(`${this.config.supabaseUrl}/functions/v1/assign-ticket-employee`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.config.supabaseKey}`
-      },
-      body: JSON.stringify({
-        ticketId: this.config.ticketId,
-        employeeId: employeeId,
-        reason: 'AI Employee assignment'
-      })
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to assign ticket: ${error}`);
-    }
-
-    const result = await response.json();
-
-    return {
-      success: true,
-      data: result.data,
-      context: {
-        ticketId: this.config.ticketId,
-        userId: this.config.aiEmployeeId,
-        timestamp: Date.now(),
-        metadata: {
-          assignedEmployee: result.data.employee
-        }
+      if (unassignError) {
+        console.error("[AssignTicketTool] Error unassigning current assignments:", unassignError);
+        throw new Error(`Failed to unassign current assignments: ${unassignError.message}`);
       }
-    };
+
+      // Create new assignment
+      console.log("[AssignTicketTool] Creating new assignment");
+      const { data: assignment, error: assignError } = await this.supabase
+        .from('employee_ticket_assignments')
+        .insert([{
+          ticket_id: this.config.ticketId,
+          employee_id: employeeId,
+          assigned_at: new Date().toISOString()
+        }])
+        .select('*, employee:employees(*)')
+        .single();
+
+      if (assignError) {
+        console.error("[AssignTicketTool] Error creating assignment:", assignError);
+        throw new Error(`Failed to create assignment: ${assignError.message}`);
+      }
+
+      console.log("[AssignTicketTool] Assignment created successfully:", assignment);
+
+      return {
+        success: true,
+        data: assignment,
+        context: {
+          ticketId: this.config.ticketId,
+          userId: this.config.aiEmployeeId,
+          timestamp: Date.now(),
+          metadata: {
+            assignedEmployee: assignment.employee
+          }
+        }
+      };
+    } catch (error) {
+      console.error("[AssignTicketTool] Assignment failed:", error);
+      throw error; // Let the _call method handle the error formatting
+    }
   }
 } 
