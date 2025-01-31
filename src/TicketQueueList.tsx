@@ -34,16 +34,9 @@ export const TicketQueueList = () => {
   const queueTitle = isSupervisor ? 'Team Queue' : 'My Tickets';
 
   const filteredTickets = tickets.filter((ticket: TicketListItemType) => {
-    const matchesSearch = searchQuery === "" || 
-      ticket.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      ticket.customer.toLowerCase().includes(searchQuery.toLowerCase());
-
-    const matchesStatus = statusFilter === "" || 
-      ticket.status.toLowerCase() === statusFilter.toLowerCase();
-
-    const matchesPriority = priorityFilter === "" || 
-      ticket.priority.toLowerCase() === priorityFilter.toLowerCase();
-
+    const matchesSearch = !searchQuery || ticket.subject.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = !statusFilter || ticket.status === statusFilter;
+    const matchesPriority = !priorityFilter || ticket.priority === priorityFilter;
     return matchesSearch && matchesStatus && matchesPriority;
   });
 
@@ -86,18 +79,17 @@ export const TicketQueueList = () => {
               {isSupervisor ? 'No tickets found' : 'No tickets found'}
             </div>
           ) : (
-            <TicketListItems 
-              tickets={filteredTickets} 
+            <TicketListItems
+              tickets={filteredTickets}
               selectedTickets={selectedTickets}
-              queueType={isSupervisor ? 'team' : 'personal'}
               onTicketSelect={id => {
                 setSelectedTickets(prev => 
                   prev.includes(id) 
                     ? prev.filter(ticketId => ticketId !== id) 
                     : [...prev, id]
                 );
-              }} 
-              onTicketClick={setSelectedTicketId} 
+              }}
+              onTicketClick={setSelectedTicketId}
             />
           )}
         </div>

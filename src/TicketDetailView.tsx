@@ -5,6 +5,7 @@ import { EmployeeAssignmentPanel } from "./EmployeeAssignmentPanel";
 import { TicketDetailCenterSection } from "./TicketDetailCenterSection";
 import { AgentPanel } from "./components/AgentPanel";
 import { useState } from "react";
+import { ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
 
 interface Props {
   ticketId: string;
@@ -34,25 +35,24 @@ export const TicketDetailView = ({
         <EmployeeAssignmentPanel ticketId={currentTicketId} />
         <InternalNotesPanel ticketId={currentTicketId} />
         <CustomFieldsPanel ticketId={currentTicketId} />
-        
-        {/* Toggle Agent Button */}
-        <button
-          onClick={() => setShowAgent(!showAgent)}
-          className="w-full py-2 px-4 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-        >
-          {showAgent ? 'Hide AI Assistant' : 'Show AI Assistant'}
-        </button>
-
-        {/* Agent Panel */}
-        {showAgent && (
-          <div className="h-96">
-            <AgentPanel 
-              ticketId={currentTicketId}
-              onClose={() => setShowAgent(false)}
-            />
-          </div>
-        )}
       </div>
+
+      {/* Chat Bubble Toggle */}
+      <button
+        onClick={() => setShowAgent(!showAgent)}
+        className="fixed bottom-6 right-6 z-40 rounded-full bg-blue-600 p-3 text-white shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-transform hover:scale-110"
+        aria-label={showAgent ? 'Hide AI Assistant' : 'Show AI Assistant'}
+      >
+        <ChatBubbleLeftRightIcon className="h-6 w-6" />
+      </button>
+
+      {/* Agent Panel */}
+      {showAgent && (
+        <AgentPanel 
+          ticketId={currentTicketId}
+          onClose={() => setShowAgent(false)}
+        />
+      )}
     </div>
   );
 };

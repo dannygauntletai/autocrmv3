@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ArrowLeft, Clock, ChevronDown, BookPlus } from "lucide-react";
 import { InteractionLog } from "./InteractionLog";
 import { RichTextEditor } from "./RichTextEditor";
 import { useTicket } from "./hooks/useTicket";
 import { TicketStatus, TicketPriority } from './types/common';
 import { supabase } from './lib/supabase';
+import { getStatusStyles, getPriorityStyles } from './utils/ticketStyles';
 
 interface Props {
   ticketId: string;
@@ -21,10 +22,25 @@ export const TicketDetailCenterSection = ({
   const { ticket, loading, error, updateTicketStatus, updateTicketPriority } = useTicket(ticketId);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [showPriorityDropdown, setShowPriorityDropdown] = useState(false);
-  const [updating, setUpdating] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState<TicketStatus | null>(null);
+  const [updatingPriority, setUpdatingPriority] = useState<TicketPriority | null>(null);
   const [showKbConfirmation, setShowKbConfirmation] = useState(false);
   const [addingToKb, setAddingToKb] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('[data-dropdown]')) {
+        setShowStatusDropdown(false);
+        setShowPriorityDropdown(false);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
 
   if (loading) {
     return (
@@ -48,18 +64,17 @@ export const TicketDetailCenterSection = ({
 
   const handleStatusChange = async (newStatus: TicketStatus) => {
     try {
-      setUpdating(true);
+      setUpdatingStatus(newStatus);
       await updateTicketStatus(newStatus);
 
       // If status is resolved, trigger feedback request
-      console.log('maybe xSending feedback request for ticket:', ticketId);
       if (newStatus === 'resolved') {
         console.log('Sending feedback request for ticket:', ticketId);
         
         const { data, error: functionError } = await supabase.functions.invoke('request-feedback', {
           body: {
             ticket_id: ticketId,
-            customer_email: ticket.email,
+            customer_email: ticket?.email,
             trigger_source: 'ui'
           }
         });
@@ -68,7 +83,7 @@ export const TicketDetailCenterSection = ({
           console.error('Failed to send feedback request:', {
             error: functionError,
             ticket: ticketId,
-            email: ticket.email
+            email: ticket?.email
           });
         } else {
           console.log('Feedback request sent successfully:', {
@@ -77,24 +92,23 @@ export const TicketDetailCenterSection = ({
           });
         }
       }
-
-      setShowStatusDropdown(false);
     } catch (err) {
       console.error('Failed to update status:', err);
     } finally {
-      setUpdating(false);
+      setUpdatingStatus(null);
+      setShowStatusDropdown(false);
     }
   };
 
   const handlePriorityChange = async (newPriority: TicketPriority) => {
     try {
-      setUpdating(true);
+      setUpdatingPriority(newPriority);
       await updateTicketPriority(newPriority);
-      setShowPriorityDropdown(false);
     } catch (err) {
       console.error('Failed to update priority:', err);
     } finally {
-      setUpdating(false);
+      setUpdatingPriority(null);
+      setShowPriorityDropdown(false);
     }
   };
 
@@ -149,28 +163,38 @@ export const TicketDetailCenterSection = ({
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <div className="relative">
+          <div className="relative" data-dropdown>
             <button
-              onClick={() => setShowStatusDropdown(!showStatusDropdown)}
-              disabled={updating}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowStatusDropdown(!showStatusDropdown);
+                setShowPriorityDropdown(false);
+              }}
+              disabled={!ticket || updatingStatus !== null}
               className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                ticket.status.toLowerCase() === 'open' ? 'bg-yellow-100 text-yellow-800' :
-                ticket.status.toLowerCase() === 'pending' ? 'bg-blue-100 text-blue-800' :
-                'bg-gray-100 text-gray-800'
-              } hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
+                ticket ? getStatusStyles(ticket.status) : 'bg-gray-100 text-gray-800'
+              } hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed`}
             >
-              {ticket.status}
-              <ChevronDown className="h-3 w-3" />
+              {updatingStatus || ticket?.status}
+              {updatingStatus ? (
+                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-current" />
+              ) : (
+                <ChevronDown className="h-3 w-3" />
+              )}
             </button>
             {showStatusDropdown && (
-              <div className="absolute mt-1 w-32 bg-white rounded-md shadow-lg z-10">
+              <div className="absolute mt-1 w-32 bg-white rounded-md shadow-lg z-10 border border-gray-200">
                 <div className="py-1">
                   {STATUS_OPTIONS.map((status) => (
                     <button
                       key={status}
                       onClick={() => handleStatusChange(status)}
-                      disabled={updating}
-                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 capitalize"
+                      disabled={updatingStatus !== null}
+                      className={`block w-full text-left px-4 py-2 text-sm ${
+                        status === ticket?.status
+                          ? 'bg-gray-50 text-blue-600 font-medium'
+                          : 'text-gray-700 hover:bg-gray-50'
+                      } capitalize disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
                       {status}
                     </button>
@@ -179,28 +203,38 @@ export const TicketDetailCenterSection = ({
               </div>
             )}
           </div>
-          <div className="relative">
+          <div className="relative" data-dropdown>
             <button
-              onClick={() => setShowPriorityDropdown(!showPriorityDropdown)}
-              disabled={updating}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowPriorityDropdown(!showPriorityDropdown);
+                setShowStatusDropdown(false);
+              }}
+              disabled={!ticket || updatingPriority !== null}
               className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                ticket.priority.toLowerCase() === 'high' ? 'bg-red-100 text-red-800' :
-                ticket.priority.toLowerCase() === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                'bg-green-100 text-green-800'
-              } hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
+                ticket ? getPriorityStyles(ticket.priority) : 'bg-gray-100 text-gray-800'
+              } hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed`}
             >
-              {ticket.priority}
-              <ChevronDown className="h-3 w-3" />
+              {updatingPriority || ticket?.priority}
+              {updatingPriority ? (
+                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-current" />
+              ) : (
+                <ChevronDown className="h-3 w-3" />
+              )}
             </button>
             {showPriorityDropdown && (
-              <div className="absolute mt-1 w-32 bg-white rounded-md shadow-lg z-10">
+              <div className="absolute mt-1 w-32 bg-white rounded-md shadow-lg z-10 border border-gray-200">
                 <div className="py-1">
                   {PRIORITY_OPTIONS.map((priority) => (
                     <button
                       key={priority}
                       onClick={() => handlePriorityChange(priority)}
-                      disabled={updating}
-                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 capitalize"
+                      disabled={updatingPriority !== null}
+                      className={`block w-full text-left px-4 py-2 text-sm ${
+                        priority === ticket?.priority
+                          ? 'bg-gray-50 text-blue-600 font-medium'
+                          : 'text-gray-700 hover:bg-gray-50'
+                      } capitalize disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
                       {priority}
                     </button>

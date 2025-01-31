@@ -64,111 +64,148 @@ export class TicketAnalyzer {
 
   async analyze(): Promise<AnalyzerResult> {
     try {
-      console.log("[TicketAnalyzer] Starting autonomous analysis for ticket:", this.config.ticketId);
+      const messages: string[] = [];
+      messages.push("Starting autonomous analysis for ticket: " + this.config.ticketId);
       
-      // First, get ticket data and employee context
-      const ticketData = await this.readTicket();
-      const { data: employees } = await this.supabase
-        .from('employees')
-        .select(`
-          id,
-          name,
-          role,
-          employee_metrics (
-            assigned_tickets_count,
-            closed_tickets_count,
-            avg_first_response_time,
-            avg_resolution_time
-          ),
-          employee_skills!left (
-            skills
-          )
-        `)
-        .eq('status', 'active');
+      // First, get all necessary data in parallel
+      messages.push("Gathering ticket and employee data...");
+      const [ticketData, employeesResponse] = await Promise.all([
+        this.readTicket(),
+        this.supabase
+          .from('employees')
+          .select(`
+            id,
+            name,
+            role,
+            employee_metrics (
+              assigned_tickets_count,
+              closed_tickets_count,
+              avg_first_response_time,
+              avg_resolution_time
+            ),
+            employee_skills!left (
+              skills
+            )
+          `)
+          .eq('status', 'active')
+      ]);
       
       if (!ticketData.success || !ticketData.data?.ticket) {
         throw new Error(`Failed to read ticket data for analysis. Ticket ID: ${this.config.ticketId}`);
       }
 
+      messages.push("Successfully retrieved ticket data and employee information");
+
       // Format employee data to include skills
-      const employeesWithSkills = employees?.map(emp => ({
+      const employeesWithSkills = employeesResponse.data?.map(emp => ({
         ...emp,
         skills: emp.employee_skills?.[0]?.skills || {},
         metrics: emp.employee_metrics?.[0] || null
       }));
 
-      // Create agent executor for autonomous decision making
+      messages.push("Analyzing ticket with available employee data...");
+
+      // Create a single agent executor for all operations
       const executor = await initializeAgentExecutorWithOptions(this.tools, this.model, {
         agentType: "openai-functions",
         verbose: true,
         maxIterations: 5,
         returnIntermediateSteps: true,
-        // Add tracing configuration
         callbacks: [{
           handleLLMStart: async (llm: any, prompts: string[]) => {
-            console.log("[LangSmith] LLM Start:", { 
-              model: llm.modelName,
-              temperature: llm.temperature,
-              ticketId: this.config.ticketId,
-              projectName: this.config.langSmithProjectName || "autocrm-yolo"
-            });
+            messages.push("Starting analysis with AI model...");
           },
           handleToolStart: async (tool: any, input: string) => {
-            console.log("[LangSmith] Tool Start:", {
-              tool: tool.name,
-              input,
-              ticketId: this.config.ticketId,
-              projectName: this.config.langSmithProjectName || "autocrm-yolo"
-            });
+            messages.push(`Using tool: ${tool.name} with input: ${input}`);
+          },
+          handleToolEnd: async (output: string) => {
+            try {
+              const result = JSON.parse(output);
+              if (result.success) {
+                messages.push("Tool execution successful");
+              } else {
+                messages.push(`Tool execution failed: ${result.error}`);
+              }
+            } catch {
+              messages.push("Tool execution completed");
+            }
           }
         }]
       });
 
-      // Let the AI analyze and decide actions
+      // Batch all analysis and actions into a single call
+      messages.push("Executing comprehensive ticket analysis...");
       const analysisResult = await executor.call({
         input: `You are in YOLO mode - full autonomous control over ticket ${this.config.ticketId}.
                Your goal is to make meaningful progress towards resolving this ticket.
                
-               Available actions:
-               1. Update status - Use when ticket state changes
-               2. Update priority - Adjust based on urgency and impact
-               3. Assign to employees - Match skills and workload
-               4. Add internal notes - Document your analysis and decisions
-               5. Send customer messages - Communicate updates or request info
-
-               Analysis steps:
-               1. Review ticket details and history thoroughly
-               2. Assess current status and priority
-               3. Evaluate if the ticket needs assignment/reassignment
-               4. Document your analysis with internal notes
-               5. Take appropriate actions based on analysis
-               6. Update stakeholders as needed
-
-               When adding internal notes:
-               - Document your reasoning for changes
-               - Note important observations
-               - Highlight next steps or blockers
-               - Add context for other employees
-
-               When choosing employees, consider:
-               - Current workload (assigned_tickets_count)
-               - Performance metrics (avg_response_time, resolution_time)
-               - Skills and proficiency levels
-               - Role and expertise
-
+               Current ticket data: ${JSON.stringify(ticketData.data)}
+               
                Available employees and their metrics:
                ${JSON.stringify(employeesWithSkills, null, 2)}
-
-               Be proactive and thorough in your approach.
-               Make decisions that move the ticket towards resolution.
-               Document your thought process with internal notes.
                
-               Current ticket data: ${JSON.stringify(ticketData.data)}`
+               Analyze the ticket and take ALL necessary actions in a single response:
+               1. Assess current status and priority
+               2. Evaluate assignment needs
+               3. Document analysis with internal notes
+               4. Update status/priority if needed
+               5. Assign/reassign if needed (use format: {"employee_id": "id", "reason": "reason"})
+               6. Add customer communication if needed
+               
+               Important:
+               - When using assign_ticket tool, provide input as: {"employee_id": "employee-uuid", "reason": "reason for assignment"}
+               - Do not include ticket_id in the assignment, it's handled automatically
+               
+               Make all decisions and take all actions in this single execution.
+               Document your complete analysis and reasoning in internal notes.
+               Be thorough but efficient in your approach.`
       });
 
-      // Get response for customer communication if needed
+      messages.push("Analysis complete. Processing results...");
+
+      // Add analysis results to messages
+      if (analysisResult.intermediateSteps) {
+        messages.push("\nActions taken:");
+        analysisResult.intermediateSteps.forEach((step: AgentStep) => {
+          const action = step.action;
+          const observation = step.observation;
+          
+          try {
+            // Try to parse the observation as JSON for better formatting
+            const parsedObservation = JSON.parse(observation);
+            if (parsedObservation.success) {
+              messages.push(`✓ ${action.tool}: ${action.toolInput}`);
+              if (parsedObservation.data) {
+                const data = parsedObservation.data;
+                switch (action.tool) {
+                  case 'update_ticket_status':
+                    messages.push(`  → Status updated to: ${data.status}`);
+                    break;
+                  case 'update_ticket_priority':
+                    messages.push(`  → Priority updated to: ${data.priority}`);
+                    break;
+                  case 'assign_ticket':
+                    messages.push(`  → Assigned to: ${data.employee?.name || data.employee_id}`);
+                    break;
+                  case 'add_internal_note':
+                    messages.push(`  → Added internal note`);
+                    break;
+                }
+              }
+            } else {
+              messages.push(`✗ ${action.tool} failed: ${parsedObservation.error}`);
+            }
+          } catch {
+            // If not JSON, just show the raw action
+            messages.push(`• ${action.tool}: ${action.toolInput}`);
+          }
+        });
+      }
+
+      // If customer communication is needed, handle it
       if (analysisResult.output.toLowerCase().includes('message') || 
           analysisResult.output.toLowerCase().includes('respond')) {
+        messages.push("Generating customer response...");
         const response = await fetch(`${this.config.supabaseUrl}/functions/v1/generate-response`, {
           method: 'POST',
           headers: {
@@ -180,7 +217,8 @@ export class TicketAnalyzer {
             context: {
               ticket: ticketData.data.ticket,
               timeline: ticketData.data.timeline,
-              stats: ticketData.data.stats
+              stats: ticketData.data.stats,
+              analysis: analysisResult.output
             }
           })
         });
@@ -189,13 +227,18 @@ export class TicketAnalyzer {
           const messageResult = await response.json();
           if (messageResult.response) {
             await this.addMessage(messageResult.response, false);
+            messages.push("Customer response sent successfully");
           }
+        } else {
+          messages.push("Failed to generate customer response");
         }
       }
 
+      messages.push("YOLO mode analysis completed successfully");
+
       return {
         success: true,
-        output: analysisResult.output,
+        output: messages.join("\n"),
         steps: analysisResult.intermediateSteps,
         toolCalls: analysisResult.intermediateSteps?.map((step: AgentStep) => ({
           tool: step.action.tool,
@@ -207,7 +250,6 @@ export class TicketAnalyzer {
           timestamp: Date.now()
         }
       };
-
     } catch (error) {
       console.error("[TicketAnalyzer] Error during analysis:", error);
       return {
@@ -223,7 +265,6 @@ export class TicketAnalyzer {
 
   private async readTicket() {
     try {
-      // Use ReadTicketTool directly
       const readTicketTool = this.tools.find(tool => tool.name === "read_ticket") as ReadTicketTool;
       if (!readTicketTool) {
         throw new Error("ReadTicketTool not found in tools array");
@@ -236,52 +277,22 @@ export class TicketAnalyzer {
     }
   }
 
-  private async updateTicket(params: Record<string, any>) {
-    const executor = await initializeAgentExecutorWithOptions(
-      [this.tools[1], this.tools[2]], // Use status and priority update tools
-      this.model,
-      {
-        agentType: "openai-functions",
-        verbose: true,
-        maxIterations: 1
-      }
-    );
-
-    const result = await executor.call({ 
-      input: `Update ticket ${this.config.ticketId} with: ${JSON.stringify(params)}`
-    });
-
-    return JSON.parse(result.output);
-  }
-
   private async addMessage(message: string, isInternal: boolean) {
-    const { data: newMessage, error: messageError } = await this.supabase
-      .from('ticket_messages')
-      .insert({
-        ticket_id: this.config.ticketId,
-        message_body: message,
-        sender_type: 'employee',
-        is_internal: isInternal,
-        sender_id: this.config.aiEmployeeId,
-        created_at: new Date().toISOString()
-      })
-      .select()
-      .single();
+    try {
+      const { error } = await this.supabase
+        .from('ticket_messages')
+        .insert({
+          ticket_id: this.config.ticketId,
+          message_body: message,
+          is_internal: isInternal,
+          sender_type: 'system',
+          sender_id: this.config.aiEmployeeId
+        });
 
-    if (messageError) throw messageError;
-
-    return {
-      success: true,
-      data: newMessage,
-      context: {
-        ticketId: this.config.ticketId,
-        userId: this.config.aiEmployeeId,
-        timestamp: Date.now(),
-        metadata: {
-          actionType: isInternal ? 'add_internal_note' : 'add_customer_message',
-          input: { message, isInternal }
-        }
-      }
-    };
+      if (error) throw error;
+    } catch (error) {
+      console.error("[TicketAnalyzer] Error adding message:", error);
+      throw error;
+    }
   }
 } 

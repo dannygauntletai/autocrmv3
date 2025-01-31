@@ -54,18 +54,25 @@ export const useTicket = (ticketId: string) => {
 
   const updateTicketStatus = async (status: TicketStatus) => {
     try {
-      const { data, error: updateError } = await supabase
+      // Update local state immediately for optimistic update
+      setTicket(prev => prev ? { ...prev, status } : null);
+
+      const { error: updateError } = await supabase
         .from('tickets')
         .update({ status, updated_at: new Date().toISOString() })
         .eq('id', ticketId)
         .select()
         .single();
 
-      if (updateError) throw updateError;
-      
-      // Update local state immediately
-      if (data) {
-        setTicket(data);
+      if (updateError) {
+        // Revert optimistic update on error
+        const { data: originalData } = await supabase
+          .from('tickets')
+          .select('*')
+          .eq('id', ticketId)
+          .single();
+        setTicket(originalData);
+        throw updateError;
       }
     } catch (err) {
       console.error('Error updating ticket status:', err);
@@ -75,18 +82,25 @@ export const useTicket = (ticketId: string) => {
 
   const updateTicketPriority = async (priority: TicketPriority) => {
     try {
-      const { data, error: updateError } = await supabase
+      // Update local state immediately for optimistic update
+      setTicket(prev => prev ? { ...prev, priority } : null);
+
+      const { error: updateError } = await supabase
         .from('tickets')
         .update({ priority, updated_at: new Date().toISOString() })
         .eq('id', ticketId)
         .select()
         .single();
 
-      if (updateError) throw updateError;
-      
-      // Update local state immediately
-      if (data) {
-        setTicket(data);
+      if (updateError) {
+        // Revert optimistic update on error
+        const { data: originalData } = await supabase
+          .from('tickets')
+          .select('*')
+          .eq('id', ticketId)
+          .single();
+        setTicket(originalData);
+        throw updateError;
       }
     } catch (err) {
       console.error('Error updating ticket priority:', err);

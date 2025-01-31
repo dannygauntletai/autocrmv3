@@ -1,5 +1,5 @@
 export type TicketStatus = 'open' | 'pending' | 'resolved';
-export type TicketPriority = 'high' | 'medium' | 'low';
+export type TicketPriority = 'low' | 'medium' | 'high';
 
 // We'll keep TicketCategory for backward compatibility but make it a string
 export type TicketCategory = string;
@@ -25,7 +25,8 @@ export interface TicketListItemType {
   customer: string;
   status: TicketStatus;
   priority: TicketPriority;
-  lastUpdate: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface TicketHistory {

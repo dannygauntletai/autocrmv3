@@ -9,6 +9,43 @@ interface Props {
   queueType: 'personal' | 'team';
 }
 
+function formatDate(dateString: string): string {
+  const date = new Date(dateString);
+  
+  // If the date is invalid, return a fallback
+  if (isNaN(date.getTime())) {
+    return 'Invalid date';
+  }
+
+  // If it's today, show time
+  const today = new Date();
+  if (date.toDateString() === today.toDateString()) {
+    return date.toLocaleTimeString(undefined, { 
+      hour: 'numeric', 
+      minute: '2-digit',
+      hour12: true 
+    });
+  }
+
+  // If it's this year, show month and day
+  if (date.getFullYear() === today.getFullYear()) {
+    return date.toLocaleDateString(undefined, { 
+      month: 'short', 
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+  }
+
+  // Otherwise show full date
+  return date.toLocaleDateString(undefined, { 
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
+}
+
 export const TicketListItem = ({
   ticket,
   isSelected,
@@ -69,7 +106,7 @@ export const TicketListItem = ({
           </div>
         </div>
         <div className="text-sm text-gray-500">
-          {new Date(ticket.lastUpdate).toLocaleDateString()}
+          {formatDate(ticket.updated_at)}
         </div>
       </div>
     </div>

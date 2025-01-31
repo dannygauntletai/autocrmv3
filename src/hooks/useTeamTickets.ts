@@ -43,7 +43,6 @@ export const useTeamTickets = () => {
             created_at,
             updated_at,
             email,
-            tags,
             team_ticket_assignments!inner(team_id)
           `)
           .in('team_ticket_assignments.team_id', teamIds)
@@ -59,8 +58,8 @@ export const useTeamTickets = () => {
           status: ticket.status,
           priority: ticket.priority,
           customer: ticket.email,
-          lastUpdate: new Date(ticket.updated_at).toLocaleString(),
-          tags: ticket.tags || []
+          created_at: ticket.created_at,
+          updated_at: ticket.updated_at
         }));
 
         setTickets(formattedTickets);
@@ -75,9 +74,9 @@ export const useTeamTickets = () => {
 
     fetchTeamTickets();
 
-    // Subscribe to changes in team ticket assignments
-    const subscription = supabase
-      .channel('team_tickets_changes')
+    // Subscribe to changes in team ticket assignments and ticket updates
+    const assignmentSubscription = supabase
+      .channel('team_tickets_assignments_changes')
       .on(
         'postgres_changes',
         {
@@ -91,8 +90,24 @@ export const useTeamTickets = () => {
       )
       .subscribe();
 
+    const ticketSubscription = supabase
+      .channel('team_tickets_updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tickets'
+        },
+        () => {
+          fetchTeamTickets();
+        }
+      )
+      .subscribe();
+
     return () => {
-      subscription.unsubscribe();
+      assignmentSubscription.unsubscribe();
+      ticketSubscription.unsubscribe();
     };
   }, [user]);
 

@@ -50,8 +50,8 @@ export const useAssignedTickets = () => {
           status: ticket.status,
           priority: ticket.priority,
           customer: ticket.email,
-          lastUpdate: new Date(ticket.updated_at).toLocaleString(),
-          tags: ticket.tags || []
+          created_at: ticket.created_at,
+          updated_at: ticket.updated_at
         }));
 
         setTickets(formattedTickets);
@@ -66,9 +66,9 @@ export const useAssignedTickets = () => {
 
     fetchAssignedTickets();
 
-    // Subscribe to changes in ticket assignments
-    const subscription = supabase
-      .channel('assigned_tickets_changes')
+    // Subscribe to changes in ticket assignments and ticket updates
+    const assignmentSubscription = supabase
+      .channel('assigned_tickets_assignments_changes')
       .on(
         'postgres_changes',
         {
@@ -82,8 +82,24 @@ export const useAssignedTickets = () => {
       )
       .subscribe();
 
+    const ticketSubscription = supabase
+      .channel('assigned_tickets_updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tickets'
+        },
+        () => {
+          fetchAssignedTickets();
+        }
+      )
+      .subscribe();
+
     return () => {
-      subscription.unsubscribe();
+      assignmentSubscription.unsubscribe();
+      ticketSubscription.unsubscribe();
     };
   }, [user]);
 

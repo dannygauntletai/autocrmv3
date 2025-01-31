@@ -166,17 +166,13 @@ serve(async (req) => {
     }
 
     // Extract JWT and set up Supabase client
-    const authHeader = req.headers.get('Authorization');
-    console.log('Auth header present:', !!authHeader);
-    
-    if (!authHeader) {
-      throw new Error('Missing Authorization header');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    if (!serviceRoleKey) {
+      throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured in environment variables')
     }
-    const serviceRoleKey = authHeader.replace('Bearer ', '');
 
     // Check Supabase configuration
-    console.log('Supabase URL configured:', !!Deno.env.get('SUPABASE_URL'));
-    console.log('Service Role Key matches:', serviceRoleKey === Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
+    console.log('Supabase URL configured:', !!Deno.env.get('SUPABASE_URL'))
 
     const supabaseClient = createClient<Database>(
       Deno.env.get('SUPABASE_URL') || '',
