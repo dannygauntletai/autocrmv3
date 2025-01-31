@@ -8,7 +8,8 @@ import {
   UpdateTicketStatusTool, 
   UpdateTicketPriorityTool,
   AssignTicketTool,
-  AddInternalNoteTool
+  AddInternalNoteTool,
+  AddToKnowledgebaseTool
 } from "../tools/ticket/index.ts";
 import { MemoryManagementTool } from "../tools/memory.ts";
 import { SearchTool } from "../tools/search.ts";
@@ -66,6 +67,7 @@ export class SupportAgent {
       new UpdateTicketPriorityTool(config),
       new AssignTicketTool(config),
       new AddInternalNoteTool(config),
+      new AddToKnowledgebaseTool(config),
       new MemoryManagementTool(config.ticketId, config.supabaseUrl, config.supabaseKey),
       new SearchTool(config.supabaseUrl, config.supabaseKey),
       new MessageTool(config.ticketId, config.supabaseUrl, config.supabaseKey, config.aiEmployeeId)
@@ -93,6 +95,7 @@ export class SupportAgent {
       new UpdateTicketPriorityTool(config),
       new AssignTicketTool(config),
       new AddInternalNoteTool(config),
+      new AddToKnowledgebaseTool(config),
       new MemoryManagementTool(config.ticketId, config.supabaseUrl, config.supabaseKey),
       new SearchTool(config.supabaseUrl, config.supabaseKey),
       new MessageTool(config.ticketId, config.supabaseUrl, config.supabaseKey, config.aiEmployeeId)
