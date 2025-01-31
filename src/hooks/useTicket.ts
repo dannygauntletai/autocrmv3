@@ -8,6 +8,8 @@ export const useTicket = (ticketId: string) => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let isSubscribed = true;
+
     const fetchTicket = async () => {
       try {
         const { data, error: fetchError } = await supabase
@@ -17,63 +19,70 @@ export const useTicket = (ticketId: string) => {
           .single();
 
         if (fetchError) throw fetchError;
-        setTicket(data);
+        if (isSubscribed) {
+          setTicket(data);
+          setError(null);
+        }
       } catch (err) {
         console.error('Error fetching ticket:', err);
-        setError(err instanceof Error ? err.message : 'Failed to fetch ticket');
+        if (isSubscribed) {
+          setError(err instanceof Error ? err.message : 'Failed to fetch ticket');
+        }
       } finally {
-        setLoading(false);
+        if (isSubscribed) {
+          setLoading(false);
+        }
       }
     };
 
     fetchTicket();
 
-    // Subscribe to changes
-    const subscription = supabase
-      .channel(`ticket_${ticketId}`)
+    // Create a unique channel name for this ticket subscription
+    const channelName = `ticket-${ticketId}-${Math.random()}`;
+    console.log('Creating new channel:', channelName);
+
+    const channel = supabase.channel(channelName)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'tickets',
-          filter: `id=eq.${ticketId}`
+          filter: `id=eq.${ticketId}`,
         },
         (payload) => {
-          if (payload.new) {
-            setTicket(payload.new as Ticket);
+          console.log('Received ticket update:', payload);
+          if (isSubscribed) {
+            if (payload.eventType === 'DELETE') {
+              setTicket(null);
+            } else {
+              setTicket(payload.new as Ticket);
+            }
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log(`Subscription status for ${channelName}:`, status);
+      });
 
     return () => {
-      subscription.unsubscribe();
+      console.log('Cleaning up subscription for channel:', channelName);
+      isSubscribed = false;
+      supabase.removeChannel(channel);
     };
   }, [ticketId]);
 
   const updateTicketStatus = async (status: TicketStatus) => {
     try {
-      // Update local state immediately for optimistic update
-      setTicket(prev => prev ? { ...prev, status } : null);
-
       const { error: updateError } = await supabase
         .from('tickets')
-        .update({ status, updated_at: new Date().toISOString() })
-        .eq('id', ticketId)
-        .select()
-        .single();
+        .update({ 
+          status, 
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', ticketId);
 
-      if (updateError) {
-        // Revert optimistic update on error
-        const { data: originalData } = await supabase
-          .from('tickets')
-          .select('*')
-          .eq('id', ticketId)
-          .single();
-        setTicket(originalData);
-        throw updateError;
-      }
+      if (updateError) throw updateError;
     } catch (err) {
       console.error('Error updating ticket status:', err);
       throw err;
@@ -82,26 +91,15 @@ export const useTicket = (ticketId: string) => {
 
   const updateTicketPriority = async (priority: TicketPriority) => {
     try {
-      // Update local state immediately for optimistic update
-      setTicket(prev => prev ? { ...prev, priority } : null);
-
       const { error: updateError } = await supabase
         .from('tickets')
-        .update({ priority, updated_at: new Date().toISOString() })
-        .eq('id', ticketId)
-        .select()
-        .single();
+        .update({ 
+          priority, 
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', ticketId);
 
-      if (updateError) {
-        // Revert optimistic update on error
-        const { data: originalData } = await supabase
-          .from('tickets')
-          .select('*')
-          .eq('id', ticketId)
-          .single();
-        setTicket(originalData);
-        throw updateError;
-      }
+      if (updateError) throw updateError;
     } catch (err) {
       console.error('Error updating ticket priority:', err);
       throw err;

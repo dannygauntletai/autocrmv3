@@ -52,7 +52,7 @@ serve(async (req) => {
     const serviceRoleKey = authHeader.replace('Bearer ', '')
 
     // Initialize Supabase client with service role key
-    const supabaseClient = createClient(
+    const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       serviceRoleKey,
       {
@@ -64,7 +64,7 @@ serve(async (req) => {
     )
 
     // Get current ticket status
-    const { data: currentTicket, error: fetchError } = await supabaseClient
+    const { data: currentTicket, error: fetchError } = await supabaseAdmin
       .from('tickets')
       .select('status')
       .eq('id', ticketId)
@@ -74,7 +74,7 @@ serve(async (req) => {
     if (!currentTicket) throw new Error('Ticket not found')
 
     // Update ticket status
-    const { data: ticket, error: updateError } = await supabaseClient
+    const { data: ticket, error: updateError } = await supabaseAdmin
       .from('tickets')
       .update({ 
         status,
@@ -85,6 +85,43 @@ serve(async (req) => {
       .single()
 
     if (updateError) throw updateError
+
+    // Add to ticket history
+    const { error: historyError } = await supabaseAdmin
+      .from('ticket_history')
+      .insert({
+        ticket_id: ticketId,
+        changed_by: 'ai-employee',
+        changes: {
+          status: {
+            old: currentTicket.status,
+            new: status
+          },
+          reason: reason || 'AI Employee update'
+        },
+        created_at: new Date().toISOString()
+      })
+
+    if (historyError) {
+      console.error('Error adding ticket history:', historyError)
+      // Don't throw here as the status update was successful
+    }
+
+    // Broadcast the change to all connected clients
+    const channel = supabaseAdmin.channel('ticket_updates')
+    await channel.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await channel.send({
+          type: 'broadcast',
+          event: 'ticket_update',
+          payload: {
+            ticket_id: ticketId,
+            status: status,
+            updated_at: new Date().toISOString()
+          }
+        })
+      }
+    })
 
     return new Response(
       JSON.stringify({
