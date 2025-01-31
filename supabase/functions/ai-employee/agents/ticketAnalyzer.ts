@@ -11,6 +11,8 @@ import {
   AddInternalNoteTool 
 } from "../tools/ticket/index.ts";
 import { createClient } from "@supabase/supabase-js";
+import { SupportAgentConfig } from "./supportAgent.ts";
+import { MODEL_CONFIGS } from "../types.ts";
 
 export interface TicketAnalyzerConfig extends BaseToolConfig {
   openAiKey: string;
@@ -54,12 +56,18 @@ export class TicketAnalyzer {
       new AddInternalNoteTool(config)
     ];
 
-    // Initialize model with high temperature for creative decisions
+    const modelConfig = MODEL_CONFIGS[this.determineModelComplexity()];
     this.model = new ChatOpenAI({
       openAIApiKey: config.openAiKey,
-      modelName: config.model || "gpt-4-1106-preview",
-      temperature: config.temperature || 0.9, // High temperature for more autonomous decisions
+      modelName: config.model || modelConfig.modelName,
+      temperature: config.temperature || modelConfig.temperature,
     });
+  }
+
+  private determineModelComplexity(): 'simple' | 'complex' {
+    // Ticket analysis is typically a complex operation
+    // as it requires understanding context and making nuanced decisions
+    return 'complex';
   }
 
   async analyze(): Promise<AnalyzerResult> {

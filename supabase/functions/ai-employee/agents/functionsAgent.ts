@@ -18,6 +18,8 @@ import {
   FunctionMessage
 } from "langchain/schema";
 import { BaseToolConfig } from "../tools/ticket/types.ts";
+import { SupportAgentConfig } from "./supportAgent.ts";
+import { MODEL_CONFIGS } from "../types.ts";
 
 export interface FunctionsAgentConfig extends BaseToolConfig {
   openAiKey: string;
@@ -50,51 +52,38 @@ export class FunctionsAgent {
   private model: ChatOpenAI;
   private executor: AgentExecutor;
 
-  private constructor(
-    config: FunctionsAgentConfig, 
-    tools: Tool[], 
-    executor: AgentExecutor
-  ) {
+  constructor(config: FunctionsAgentConfig, tools: Tool[], executor: AgentExecutor) {
     this.config = config;
     this.tools = tools;
     this.executor = executor;
-    
-    // Initialize model with function calling
+
+    const modelConfig = MODEL_CONFIGS[this.determineModelComplexity()];
     this.model = new ChatOpenAI({
       openAIApiKey: config.openAiKey,
-      modelName: config.model || "gpt-4-1106-preview",
-      temperature: config.temperature || 0.2,
+      modelName: config.model || modelConfig.modelName,
+      temperature: config.temperature || modelConfig.temperature,
     });
   }
 
+  private determineModelComplexity(): 'simple' | 'complex' {
+    // Functions agent typically handles complex operations
+    // as it's responsible for multi-step reasoning and tool selection
+    return 'complex';
+  }
+
   static async create(config: FunctionsAgentConfig, tools: Tool[]): Promise<FunctionsAgent> {
+    const modelConfig = MODEL_CONFIGS['complex']; // Functions agent always uses complex model
     const model = new ChatOpenAI({
       openAIApiKey: config.openAiKey,
-      modelName: config.model || "gpt-4-1106-preview",
-      temperature: config.temperature || 0.2,
+      modelName: config.model || modelConfig.modelName,
+      temperature: config.temperature || modelConfig.temperature,
     });
 
-    // Create the prompt for the agent
-    const prompt = ChatPromptTemplate.fromPromptMessages([
-      SystemMessagePromptTemplate.fromTemplate(
-        `You are an AI support agent handling ticket ${config.ticketId}.
-Your goal is to assist users by taking appropriate actions based on their requests.
-Think carefully about each action before executing it.
-Explain your reasoning clearly and verify the results of each action.`
-      ),
-      new MessagesPlaceholder("chat_history"),
-      HumanMessagePromptTemplate.fromTemplate("{input}"),
-      new MessagesPlaceholder("agent_scratchpad"),
-    ]);
-
-    // Create the OpenAI functions agent
     const executor = await initializeAgentExecutorWithOptions(tools, model, {
       agentType: "openai-functions",
       verbose: true,
       returnIntermediateSteps: true,
-      agentArgs: {
-        prefix: prompt.toString(),
-      },
+      maxIterations: 5,
     });
 
     return new FunctionsAgent(config, tools, executor);

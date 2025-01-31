@@ -50,4 +50,22 @@ export interface AIEmployeeState {
     shortTerm: BaseMessage[];
     workingMemory: Record<string, any>;
   };
-} 
+}
+
+export type ModelType = 'gpt-4-turbo-preview' | 'gpt-3.5-turbo';
+
+export interface ModelConfig {
+  modelName: ModelType;
+  temperature: number;
+}
+
+export const MODEL_CONFIGS: Record<'simple' | 'complex', ModelConfig> = {
+  simple: {
+    modelName: 'gpt-3.5-turbo',
+    temperature: 0.3
+  },
+  complex: {
+    modelName: 'gpt-4-turbo-preview',
+    temperature: 0.7
+  }
+} as const; 

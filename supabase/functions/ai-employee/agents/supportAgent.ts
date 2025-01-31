@@ -16,6 +16,7 @@ import { MessageTool } from "../tools/message.ts";
 import { TicketAnalyzer } from "./ticketAnalyzer.ts";
 import { FunctionsAgent } from "./functionsAgent.ts";
 import { BaseMessage, AIMessage, HumanMessage } from "langchain/schema";
+import { MODEL_CONFIGS, ModelType } from "../types.ts";
 
 export interface SupportAgentConfig extends BaseToolConfig {
   openAiKey: string;
@@ -25,6 +26,7 @@ export interface SupportAgentConfig extends BaseToolConfig {
   supabaseUrl: string;
   supabaseKey: string;
   aiEmployeeId: string;
+  operation?: string;
 }
 
 interface AgentResult {
@@ -69,11 +71,12 @@ export class SupportAgent {
       new MessageTool(config.ticketId, config.supabaseUrl, config.supabaseKey, config.aiEmployeeId)
     ];
 
-    // Initialize model
+    // Initialize model with appropriate configuration based on operation complexity
+    const modelConfig = MODEL_CONFIGS[this.determineModelComplexity()];
     this.model = new ChatOpenAI({
       openAIApiKey: config.openAiKey,
-      modelName: config.model || "gpt-4-1106-preview",
-      temperature: config.temperature || 0.2,
+      modelName: config.model || modelConfig.modelName,
+      temperature: config.temperature || modelConfig.temperature,
     });
 
     // Initialize YOLO mode analyzer
@@ -152,5 +155,21 @@ export class SupportAgent {
         }
       };
     }
+  }
+
+  private determineModelComplexity(): 'simple' | 'complex' {
+    // Simple operations:
+    // - Reading ticket info
+    // - Updating ticket status/priority
+    // - Adding internal notes
+    const simpleOperations = ['read', 'status', 'priority', 'note'];
+    
+    // Complex operations:
+    // - Content generation
+    // - Multi-step reasoning
+    // - Customer communication
+    // - Search and analysis
+    const operation = this.config.operation?.toLowerCase() || '';
+    return simpleOperations.some(op => operation.includes(op)) ? 'simple' : 'complex';
   }
 } 
