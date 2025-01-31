@@ -6,14 +6,22 @@ import { BaseToolConfig } from "../tools/ticket/types.ts";
 import { 
   ReadTicketTool, 
   UpdateTicketStatusTool, 
-  UpdateTicketPriorityTool 
+  UpdateTicketPriorityTool,
+  AssignTicketTool,
+  AddInternalNoteTool
 } from "../tools/ticket/index.ts";
+import { MemoryManagementTool } from "../tools/memory.ts";
+import { SearchTool } from "../tools/search.ts";
+import { MessageTool } from "../tools/message.ts";
 import { TicketAnalyzer } from "./ticketAnalyzer.ts";
 
 export interface SupportAgentConfig extends BaseToolConfig {
   openAiKey: string;
   model?: string;
   temperature?: number;
+  ticketId: string;
+  supabaseUrl: string;
+  supabaseKey: string;
 }
 
 interface AgentResult {
@@ -45,7 +53,12 @@ export class SupportAgent {
     this.tools = [
       new ReadTicketTool(config),
       new UpdateTicketStatusTool(config),
-      new UpdateTicketPriorityTool(config)
+      new UpdateTicketPriorityTool(config),
+      new AssignTicketTool(config),
+      new AddInternalNoteTool(config),
+      new MemoryManagementTool(config.ticketId, config.supabaseUrl, config.supabaseKey),
+      new SearchTool(config.supabaseUrl, config.supabaseKey),
+      new MessageTool(config.ticketId, config.supabaseUrl, config.supabaseKey)
     ];
 
     // Initialize model
