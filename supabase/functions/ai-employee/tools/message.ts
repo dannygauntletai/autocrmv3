@@ -10,6 +10,7 @@ For generating responses, use 'generate customer/internal CONTEXT'.
 For analyzing messages, use 'analyze MESSAGE'.`;
   
   private ticketId: string;
+  private employeeId: string;
   private supabase;
   private supabaseUrl: string;
   private supabaseKey: string;
@@ -17,12 +18,14 @@ For analyzing messages, use 'analyze MESSAGE'.`;
   constructor(
     ticketId: string,
     supabaseUrl: string,
-    supabaseKey: string
+    supabaseKey: string,
+    employeeId: string
   ) {
     super();
     this.ticketId = ticketId;
     this.supabaseUrl = supabaseUrl;
     this.supabaseKey = supabaseKey;
+    this.employeeId = employeeId;
     this.supabase = createClient(supabaseUrl, supabaseKey);
   }
 
@@ -100,8 +103,8 @@ For analyzing messages, use 'analyze MESSAGE'.`;
         .insert({
           ticket_id: this.ticketId,
           message_body: content.trim(),
-          sender_type: 'system',
-          sender_id: '00000000-0000-0000-0000-000000000000',
+          sender_type: 'employee',
+          sender_id: this.employeeId,
           is_internal: type === 'internal',
           created_at: new Date().toISOString()
         })
@@ -120,7 +123,7 @@ For analyzing messages, use 'analyze MESSAGE'.`;
         .from('ticket_history')
         .insert({
           ticket_id: this.ticketId,
-          changed_by: '00000000-0000-0000-0000-000000000000',
+          changed_by: this.employeeId,
           changes: {
             type: type === 'internal' ? 'internal_note' : 'customer_message',
             message: {

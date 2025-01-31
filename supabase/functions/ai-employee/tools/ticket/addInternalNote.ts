@@ -59,7 +59,7 @@ export class AddInternalNoteTool extends Tool {
         ticket_id: this.config.ticketId,
         message_body: note,
         sender_type: 'employee',
-        sender_id: this.config.aiEmployeeId,
+        sender_id: this.config.employeeId || this.config.aiEmployeeId,
         is_internal: true,
         created_at: new Date().toISOString()
       })
@@ -73,7 +73,7 @@ export class AddInternalNoteTool extends Tool {
       .from('ticket_history')
       .insert({
         ticket_id: this.config.ticketId,
-        changed_by: this.config.aiEmployeeId,
+        changed_by: this.config.employeeId || this.config.aiEmployeeId,
         changes: {
           type: 'internal_note',
           note: {
@@ -91,7 +91,7 @@ export class AddInternalNoteTool extends Tool {
       data: message,
       context: {
         ticketId: this.config.ticketId,
-        userId: this.config.aiEmployeeId,
+        userId: this.config.employeeId || this.config.aiEmployeeId,
         timestamp: Date.now(),
         metadata: {
           messageType: 'internal',

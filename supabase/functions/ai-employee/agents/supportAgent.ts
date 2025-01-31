@@ -24,6 +24,7 @@ export interface SupportAgentConfig extends BaseToolConfig {
   ticketId: string;
   supabaseUrl: string;
   supabaseKey: string;
+  aiEmployeeId: string;
 }
 
 interface AgentResult {
@@ -65,7 +66,7 @@ export class SupportAgent {
       new AddInternalNoteTool(config),
       new MemoryManagementTool(config.ticketId, config.supabaseUrl, config.supabaseKey),
       new SearchTool(config.supabaseUrl, config.supabaseKey),
-      new MessageTool(config.ticketId, config.supabaseUrl, config.supabaseKey)
+      new MessageTool(config.ticketId, config.supabaseUrl, config.supabaseKey, config.aiEmployeeId)
     ];
 
     // Initialize model
@@ -91,7 +92,7 @@ export class SupportAgent {
       new AddInternalNoteTool(config),
       new MemoryManagementTool(config.ticketId, config.supabaseUrl, config.supabaseKey),
       new SearchTool(config.supabaseUrl, config.supabaseKey),
-      new MessageTool(config.ticketId, config.supabaseUrl, config.supabaseKey)
+      new MessageTool(config.ticketId, config.supabaseUrl, config.supabaseKey, config.aiEmployeeId)
     ];
 
     const functionsAgent = await FunctionsAgent.create(config, tools);

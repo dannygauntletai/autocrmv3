@@ -30,6 +30,7 @@ export interface BaseToolConfig {
   supabaseUrl: string;
   supabaseKey: string;
   aiEmployeeId: string;
+  employeeId?: string;
 }
 
 export type TicketStatus = 'new' | 'open' | 'pending' | 'resolved' | 'closed';
