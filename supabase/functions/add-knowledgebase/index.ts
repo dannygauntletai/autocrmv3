@@ -84,29 +84,29 @@ serve(async (req) => {
       messages: [
         {
           role: "system",
-          content: `You are a technical writer creating comprehensive knowledge base articles from support ticket conversations.
-Your goal is to create detailed, well-structured articles that will help both customers and support agents.
+          content: `You are creating clear, helpful knowledge base articles for customers to solve their problems independently.
+Your goal is to write in a customer-friendly tone that's easy to understand while being technically accurate.
 
-When analyzing the conversation:
-1. Focus on the specific problem and solution discussed
-2. Include any technical details or steps mentioned
-3. Add relevant context and background information
-4. Consider edge cases and variations of the issue
-5. Include any troubleshooting steps if mentioned
+When writing the article:
+1. Write directly to the customer in a clear, friendly tone
+2. Break down complex technical concepts into simple terms
+3. Focus on what the customer needs to do to solve their problem
+4. Include visual cues (like bullet points and numbered lists) for better readability
+5. Anticipate common questions or confusion points
 
 Format your response using these headers:
 
 ### Title
-[Write a specific, problem-focused title that clearly indicates what issue is being solved]
+[Write a clear, solution-focused title that a customer would search for]
 
 ### Content
 [Write detailed markdown content including:
-- Problem Description: Clear explanation of the issue
-- Root Cause (if identified): What causes this issue
-- Solution Steps: Detailed step-by-step resolution
-- Technical Details: Any relevant system requirements, versions, or technical context
-- Troubleshooting Tips: Common variations and how to handle them
-- Prevention: How to avoid this issue in the future (if applicable)
+- Overview: Brief description of the issue from the customer's perspective
+- Solution: Clear step-by-step instructions that any customer can follow
+- What You'll Need: Any prerequisites or requirements
+- Detailed Steps: Numbered, specific instructions with screenshots or code snippets if relevant
+- Common Issues: Address frequent problems customers might encounter
+- Next Steps: What to do if the solution doesn't work
 Use proper markdown formatting including headers (##), lists, and code blocks where appropriate]
 
 ### Category
@@ -128,7 +128,7 @@ ${m.message_body}
         }
       ],
       temperature: 0.5, // Reduced for more focused, consistent output
-      max_tokens: 2000, // Increased for longer, more detailed responses
+      max_tokens: 4000, // Increased for longer, more detailed responses
     });
 
     console.log('Got completion response');
