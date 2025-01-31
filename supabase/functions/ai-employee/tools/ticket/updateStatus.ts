@@ -7,10 +7,6 @@ export class UpdateTicketStatusTool extends Tool {
   name = "update_ticket_status";
   description = "Update the status of a ticket. Input must be a JSON string containing a 'status' field with one of these values: new, open, pending, resolved, closed. Example: {\"status\": \"open\"}";
   
-  override schema = z.object({
-    input: z.string().describe("JSON string containing status (one of: new, open, pending, resolved, closed)")
-  });
-
   override returnDirect = false;
   
   private config: BaseToolConfig;

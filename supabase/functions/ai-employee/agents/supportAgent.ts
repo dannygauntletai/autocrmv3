@@ -102,35 +102,15 @@ export class SupportAgent {
       messages.push("Analyzing user request...");
       // Define the task based on user input
       const task = `
-        You are an AI support employee working on ticket ${this.config.ticketId}.
-        The user (your supervisor) has given you this instruction: "${userInput}"
+        Support employee for ticket ${this.config.ticketId}. Instruction: "${userInput}"
         
-        First, determine if this is:
-        1. A general conversation (like greetings, questions, or casual chat)
-        2. A specific request to take action on the ticket
+        If general conversation: respond naturally.
+        If action request: use appropriate tool(s):
+        - read_ticket: Get ticket info
+        - update_ticket_status: Change status
+        - update_ticket_priority: Change priority
         
-        If it's general conversation:
-        - Respond naturally without using any tools
-        - Keep responses professional but friendly
-        - If they ask about capabilities, explain what you can do
-        
-        If it's a specific request for ticket actions:
-        1. First, understand what action is being requested
-        2. If needed, use read_ticket to get current ticket information
-        3. Take the appropriate action using the available tools
-        4. Explain your reasoning and actions clearly
-        
-        Available actions (use ONLY when explicitly requested):
-        - Read ticket details (use read_ticket)
-        - Update ticket status (use update_ticket_status)
-        - Update ticket priority (use update_ticket_priority)
-        
-        Important:
-        - Only use tools when explicitly asked to take action on the ticket
-        - Be precise and specific in your actions
-        - If the request is unclear, ask for clarification
-        
-        Process the user's request appropriately.
+        Only use tools when explicitly requested. Ask for clarification if unclear.
       `;
 
       messages.push("Executing task...");

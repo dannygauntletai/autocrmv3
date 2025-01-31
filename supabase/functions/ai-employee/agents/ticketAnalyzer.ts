@@ -136,29 +136,17 @@ export class TicketAnalyzer {
       // Batch all analysis and actions into a single call
       messages.push("Executing comprehensive ticket analysis...");
       const analysisResult = await executor.call({
-        input: `You are in YOLO mode - full autonomous control over ticket ${this.config.ticketId}.
-               Your goal is to make meaningful progress towards resolving this ticket.
+        input: `YOLO mode for ticket ${this.config.ticketId}.
+               Ticket: ${JSON.stringify(ticketData.data)}
+               Employees: ${JSON.stringify(employeesWithSkills)}
                
-               Current ticket data: ${JSON.stringify(ticketData.data)}
+               Take necessary actions:
+               1. Assess and update status/priority if needed
+               2. Assign/reassign (format: {"employee_id": "id", "reason": "reason"})
+               3. Add internal notes for decisions
+               4. Add customer communication if needed
                
-               Available employees and their metrics:
-               ${JSON.stringify(employeesWithSkills, null, 2)}
-               
-               Analyze the ticket and take ALL necessary actions in a single response:
-               1. Assess current status and priority
-               2. Evaluate assignment needs
-               3. Document analysis with internal notes
-               4. Update status/priority if needed
-               5. Assign/reassign if needed (use format: {"employee_id": "id", "reason": "reason"})
-               6. Add customer communication if needed
-               
-               Important:
-               - When using assign_ticket tool, provide input as: {"employee_id": "employee-uuid", "reason": "reason for assignment"}
-               - Do not include ticket_id in the assignment, it's handled automatically
-               
-               Make all decisions and take all actions in this single execution.
-               Document your complete analysis and reasoning in internal notes.
-               Be thorough but efficient in your approach.`
+               Make all decisions in one execution. Document reasoning in notes.`
       });
 
       messages.push("Analysis complete. Processing results...");
