@@ -3,13 +3,13 @@ import { createClient } from '@supabase/supabase-js';
 import { BaseToolConfig, AssignmentType, AssignmentAction, AssignmentResult } from '../../types.ts';
 import type { Database } from '../../../../../types/database.types';
 
-type Team = {
+interface Team {
   id: string;
   name: string;
   description: string | null;
   created_at: string;
   updated_at: string;
-};
+}
 
 type TeamTicketAssignment = {
   id: string;
@@ -22,12 +22,13 @@ type TeamTicketAssignment = {
 
 export class AssignTeamTool extends Tool {
   name = "assign_team";
-  description = "Assign a ticket to a team. Input should be a JSON string containing {type: 'team', target: string, reason?: string}.";
+  description = "Assign a ticket to a team. Input should be a JSON string containing {type: 'team', target: string, reason?: string}. Available teams are: technical_support, customer_success, product_development, operations.";
   
   override returnDirect = false;
   
   private config: BaseToolConfig;
   private supabase;
+  private availableTeams: Map<string, Team> = new Map();
 
   constructor(config: BaseToolConfig) {
     super();
@@ -72,22 +73,25 @@ export class AssignTeamTool extends Tool {
 
       console.log("[AssignTeamTool] Parsed action:", action);
 
-      // First, look up the team
-      const { data: team, error: teamError } = await this.supabase
-        .from('teams')
-        .select('id, name')
-        .or(`id.eq.${action.target},name.ilike.%${action.target}%`)
-        .single() as { data: Team | null, error: any };
-
-      if (teamError || !team) {
-        console.error("[AssignTeamTool] Team lookup failed:", teamError);
-        throw new Error(`Team not found with name/id: ${action.target}`);
+      // First, load available teams if not already loaded
+      if (this.availableTeams.size === 0) {
+        await this.loadAvailableTeams();
       }
 
-      console.log("[AssignTeamTool] Found team:", team);
+      // Try to find the team by name or ID
+      const targetTeam = await this.findTeam(action.target);
+      if (!targetTeam) {
+        const availableTeamNames = Array.from(this.availableTeams.values())
+          .filter((v, i, a) => a.findIndex(t => t.id === v.id) === i)
+          .map(t => t.name)
+          .join(', ');
+        throw new Error(`Team not found: "${action.target}". Available teams are: ${availableTeamNames}`);
+      }
+
+      console.log("[AssignTeamTool] Found team:", targetTeam);
 
       // Assign the ticket to the team
-      const result = await this.assignTicketToTeam(team.id, action.reason);
+      const result = await this.assignTicketToTeam(targetTeam.id, action.reason);
       console.log("[AssignTeamTool] Assignment result:", result);
       
       return JSON.stringify(result);
@@ -112,6 +116,63 @@ export class AssignTeamTool extends Tool {
         }
       });
     }
+  }
+
+  private async loadAvailableTeams(): Promise<void> {
+    console.log("[AssignTeamTool] Loading available teams");
+    
+    type TeamResponse = {
+      id: string;
+      name: string;
+      description: string | null;
+      created_at: string;
+      updated_at: string;
+    };
+
+    const { data: teams, error } = await this.supabase
+      .from('teams')
+      .select('*')
+      .order('name')
+      .returns<TeamResponse[]>();
+
+    if (error) {
+      console.error("[AssignTeamTool] Error loading teams:", error);
+      throw new Error(`Failed to load available teams: ${error.message}`);
+    }
+
+    if (!teams?.length) {
+      throw new Error('No teams found in the system');
+    }
+
+    // Clear and reload the teams map
+    this.availableTeams.clear();
+    teams.forEach(team => {
+      this.availableTeams.set(team.id, team);
+      this.availableTeams.set(team.name.toLowerCase(), team);
+    });
+
+    console.log("[AssignTeamTool] Loaded teams:", 
+      Array.from(this.availableTeams.values())
+        .filter((v, i, a) => a.findIndex(t => t.id === v.id) === i)
+        .map(t => t.name)
+    );
+  }
+
+  private async findTeam(target: string): Promise<Team | null> {
+    const normalizedTarget = target.toLowerCase().trim();
+    
+    // First try exact matches
+    const exactMatch = this.availableTeams.get(normalizedTarget);
+    if (exactMatch) return exactMatch;
+
+    // Then try partial matches
+    for (const [key, value] of this.availableTeams.entries()) {
+      if (key.includes(normalizedTarget) || normalizedTarget.includes(key)) {
+        return value;
+      }
+    }
+
+    return null;
   }
 
   private async assignTicketToTeam(teamId: string, reason?: string): Promise<AssignmentResult> {
@@ -155,23 +216,26 @@ export class AssignTeamTool extends Tool {
         throw new Error(`Failed to create assignment: ${assignError?.message || 'Unknown error'}`);
       }
 
-      // Add to ticket history if reason provided
-      if (reason) {
-        await this.supabase
-          .from('ticket_history')
-          .insert({
-            ticket_id: this.config.ticketId,
-            action: 'assign_team',
-            changed_by: this.config.aiEmployeeId,
-            changes: {
-              team: {
-                id: assignment.team.id,
-                name: assignment.team.name
-              },
-              reason
+      // Add to ticket history
+      const { error: historyError } = await this.supabase
+        .from('ticket_history')
+        .insert({
+          ticket_id: this.config.ticketId,
+          changed_by: this.config.aiEmployeeId,
+          changes: {
+            type: 'team_assignment',
+            team: {
+              id: assignment.team.id,
+              name: assignment.team.name
             },
-            created_at: new Date().toISOString()
-          });
+            reason: reason || 'AI Employee assignment'
+          },
+          created_at: new Date().toISOString()
+        });
+
+      if (historyError) {
+        console.error("[AssignTeamTool] Error adding to history:", historyError);
+        // Don't throw here, as the assignment was successful
       }
 
       console.log("[AssignTeamTool] Assignment created successfully:", assignment);
@@ -191,13 +255,16 @@ export class AssignTeamTool extends Tool {
           userId: this.config.aiEmployeeId,
           timestamp: Date.now(),
           metadata: {
-            reason
+            reason,
+            availableTeams: Array.from(this.availableTeams.values())
+              .filter((v, i, a) => a.findIndex(t => t.id === v.id) === i)
+              .map(t => t.name)
           }
         }
       };
     } catch (error) {
       console.error("[AssignTeamTool] Assignment failed:", error);
-      throw error; // Let the _call method handle the error formatting
+      throw error; // Re-throw to be handled by the main try-catch
     }
   }
 } 

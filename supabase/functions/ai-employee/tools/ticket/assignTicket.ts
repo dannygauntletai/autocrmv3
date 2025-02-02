@@ -1,8 +1,10 @@
 import { Tool } from 'langchain/tools';
 import { z } from 'zod';
 import { BaseToolConfig, TicketToolResult } from './types.ts';
+import { AssignmentAction } from '../../types.ts';
 import type { Database } from '../../../../../types/database.types';
 import { createClient } from '@supabase/supabase-js';
+import { AssignTeamTool } from './assignTeam.ts';
 
 type TicketAssignment = Database['public']['Tables']['ticket_assignments']['Insert'];
 
@@ -14,11 +16,13 @@ export class AssignTicketTool extends Tool {
   
   private config: BaseToolConfig;
   private supabase;
+  private assignTeamTool: AssignTeamTool;
 
   constructor(config: BaseToolConfig) {
     super();
     this.config = config;
     this.supabase = createClient(config.supabaseUrl, config.supabaseKey);
+    this.assignTeamTool = new AssignTeamTool(config);
   }
 
   /** @ignore */
@@ -26,19 +30,34 @@ export class AssignTicketTool extends Tool {
     try {
       console.log("[AssignTicketTool] Received input:", input);
       
-      // Get the employee ID or email from input
-      let employeeIdOrEmail: string;
+      // Parse the input to determine if it's a team or employee assignment
+      let action: AssignmentAction;
       try {
         const parsed = JSON.parse(typeof input === 'string' ? input : input.input);
-        employeeIdOrEmail = parsed.employee_id;
+        action = {
+          type: parsed.type || 'employee',
+          target: parsed.target || parsed.employee_id || parsed.team_id || parsed,
+          reason: parsed.reason
+        };
       } catch {
-        // If not JSON, use the raw input
-        employeeIdOrEmail = (typeof input === 'string' ? input : input.input).trim();
+        // If parsing fails, assume it's an employee assignment
+        action = {
+          type: 'employee',
+          target: (typeof input === 'string' ? input : input.input).trim()
+        };
+      }
+
+      // If this is a team assignment, redirect to AssignTeamTool
+      if (action.type === 'team') {
+        console.log("[AssignTicketTool] Redirecting team assignment to AssignTeamTool");
+        const teamResult = await this.assignTeamTool.call(JSON.stringify(action));
+        return teamResult;
       }
       
-      console.log("[AssignTicketTool] Using employee ID or email:", employeeIdOrEmail);
+      // Handle employee assignment
+      console.log("[AssignTicketTool] Handling employee assignment");
       
-      if (!employeeIdOrEmail?.trim()) {
+      if (!action.target?.trim()) {
         throw new Error("Employee ID or email is required");
       }
 
@@ -47,25 +66,25 @@ export class AssignTicketTool extends Tool {
       }
 
       // If input looks like an email, look up the employee ID
-      let employeeId = employeeIdOrEmail;
-      if (employeeIdOrEmail.includes('@')) {
+      let employeeId = action.target;
+      if (action.target.includes('@')) {
         console.log("[AssignTicketTool] Input appears to be an email, looking up employee ID");
         const { data: employee, error: employeeError } = await this.supabase
           .from('employees')
           .select('id')
-          .eq('email', employeeIdOrEmail.toLowerCase().trim())
+          .eq('email', action.target.toLowerCase().trim())
           .single();
 
         if (employeeError || !employee) {
           console.error("[AssignTicketTool] Employee lookup failed:", employeeError);
-          throw new Error(`Employee not found with email: ${employeeIdOrEmail}`);
+          throw new Error(`Employee not found with email: ${action.target}`);
         }
         employeeId = employee.id;
         console.log("[AssignTicketTool] Found employee ID:", employeeId);
       }
 
       console.log("[AssignTicketTool] Assigning ticket to employee:", employeeId);
-      const result = await this.assignTicket(employeeId);
+      const result = await this.assignTicket(employeeId, action.reason);
       console.log("[AssignTicketTool] Assignment result:", result);
       
       return JSON.stringify(result);
@@ -92,7 +111,7 @@ export class AssignTicketTool extends Tool {
     }
   }
 
-  private async assignTicket(employeeId: string): Promise<TicketToolResult> {
+  private async assignTicket(employeeId: string, reason?: string): Promise<TicketToolResult> {
     try {
       // First unassign any current assignments
       console.log("[AssignTicketTool] Unassigning current assignments");
@@ -108,7 +127,6 @@ export class AssignTicketTool extends Tool {
       }
 
       // Create new assignment
-      console.log("[AssignTicketTool] Creating new assignment");
       const { data: assignment, error: assignError } = await this.supabase
         .from('employee_ticket_assignments')
         .insert([{
@@ -119,9 +137,28 @@ export class AssignTicketTool extends Tool {
         .select('*, employee:employees(*)')
         .single();
 
-      if (assignError) {
+      if (assignError || !assignment) {
         console.error("[AssignTicketTool] Error creating assignment:", assignError);
-        throw new Error(`Failed to create assignment: ${assignError.message}`);
+        throw new Error(`Failed to create assignment: ${assignError?.message || 'Unknown error'}`);
+      }
+
+      // Add to ticket history if reason provided
+      if (reason) {
+        await this.supabase
+          .from('ticket_history')
+          .insert({
+            ticket_id: this.config.ticketId,
+            action: 'assign_employee',
+            changed_by: this.config.aiEmployeeId,
+            changes: {
+              employee: {
+                id: assignment.employee.id,
+                name: assignment.employee.name
+              },
+              reason
+            },
+            created_at: new Date().toISOString()
+          });
       }
 
       console.log("[AssignTicketTool] Assignment created successfully:", assignment);
@@ -134,7 +171,8 @@ export class AssignTicketTool extends Tool {
           userId: this.config.aiEmployeeId,
           timestamp: Date.now(),
           metadata: {
-            assignedEmployee: assignment.employee
+            assignedEmployee: assignment.employee,
+            reason
           }
         }
       };

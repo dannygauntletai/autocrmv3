@@ -1,9 +1,7 @@
-import { ChatOpenAI } from "langchain/chat_models/openai";
 import { Tool } from "langchain/tools";
 import { AgentStep } from "langchain/schema";
 import { 
   BaseToolConfig, 
-  MODEL_CONFIGS,
   TicketAnalyzerConfig,
   AnalyzerResult,
   ToolResult
@@ -21,9 +19,9 @@ import { FunctionsAgent } from "./functionsAgent.ts";
 export class TicketAnalyzer {
   private config: TicketAnalyzerConfig;
   private tools: Tool[];
-  private model: ChatOpenAI;
   private supabase;
   private readTicketTool: ReadTicketTool;
+  private cachedTicketData?: ToolResult;
 
   constructor(config: TicketAnalyzerConfig) {
     this.config = config;
@@ -38,19 +36,6 @@ export class TicketAnalyzer {
       new AssignTicketTool(config),
       new AddInternalNoteTool(config)
     ];
-
-    const modelConfig = MODEL_CONFIGS[this.determineModelComplexity()];
-    this.model = new ChatOpenAI({
-      openAIApiKey: config.openAiKey,
-      modelName: config.model || modelConfig.modelName,
-      temperature: config.temperature || modelConfig.temperature,
-    });
-  }
-
-  private determineModelComplexity(): 'simple' | 'complex' {
-    // Ticket analysis is typically a complex operation
-    // as it requires understanding context and making nuanced decisions
-    return 'complex';
   }
 
   async analyzeWithTools(tools: Tool[], functionsAgent: FunctionsAgent): Promise<AnalyzerResult> {
@@ -85,7 +70,7 @@ export class TicketAnalyzer {
       return {
         success: true,
         output: result.output,
-        steps: result.intermediateSteps,
+        steps: result.steps,
         toolCalls: result.toolCalls?.map(call => ({
           tool: call.tool,
           input: call.input,
@@ -116,8 +101,16 @@ export class TicketAnalyzer {
 
   private async readTicket(): Promise<ToolResult> {
     try {
+      // Return cached data if available
+      if (this.cachedTicketData) {
+        return this.cachedTicketData;
+      }
+
+      // Parse the result only once and cache it
       const result = await this.readTicketTool._call('');
-      return JSON.parse(result);
+      const parsedResult = JSON.parse(result) as ToolResult;
+      this.cachedTicketData = parsedResult;
+      return parsedResult;
     } catch (error) {
       console.error("[TicketAnalyzer] Error reading ticket:", error);
       throw new Error(`Failed to read ticket: ${error instanceof Error ? error.message : String(error)}`);

@@ -50,14 +50,20 @@ export class SmartAssignTicketTool extends Tool {
       }
 
       // First, get the ticket details to understand the context
+      console.log("[SmartAssignTicketTool] Fetching ticket details");
       const ticketResponse = await this.supabase
         .from('tickets')
         .select('*, ticket_messages(message_body)')
         .eq('id', this.config.ticketId)
         .single();
 
-      if (ticketResponse.error || !ticketResponse.data) {
-        throw new Error(`Failed to fetch ticket details: ${ticketResponse.error?.message || 'No ticket found'}`);
+      if (ticketResponse.error) {
+        console.error("[SmartAssignTicketTool] Error fetching ticket:", ticketResponse.error);
+        throw new Error(`Failed to fetch ticket details: ${ticketResponse.error.message}`);
+      }
+
+      if (!ticketResponse.data) {
+        throw new Error('No ticket found');
       }
 
       const ticket = ticketResponse.data as unknown as Ticket;
@@ -72,6 +78,7 @@ export class SmartAssignTicketTool extends Tool {
       console.log("[SmartAssignTicketTool] Analyzing ticket content for assignment");
 
       // Get all employees with their metrics and skills
+      console.log("[SmartAssignTicketTool] Fetching employee data");
       const employeesResponse = await this.supabase
         .from('employees')
         .select(`
@@ -86,8 +93,13 @@ export class SmartAssignTicketTool extends Tool {
           )
         `);
 
-      if (employeesResponse.error || !employeesResponse.data) {
-        throw new Error(`Failed to fetch employees: ${employeesResponse.error?.message || 'No employees found'}`);
+      if (employeesResponse.error) {
+        console.error("[SmartAssignTicketTool] Error fetching employees:", employeesResponse.error);
+        throw new Error(`Failed to fetch employees: ${employeesResponse.error.message}`);
+      }
+
+      if (!employeesResponse.data?.length) {
+        throw new Error('No employees found');
       }
 
       const employees = employeesResponse.data as unknown as Employee[];
@@ -101,6 +113,7 @@ export class SmartAssignTicketTool extends Tool {
       // 2. Current workload
       // 3. Average resolution time
       // 4. Role suitability
+      console.log("[SmartAssignTicketTool] Scoring employees");
       const scoredEmployees = employees.map(employee => {
         let score = 100; // Start with base score
         
@@ -170,6 +183,31 @@ export class SmartAssignTicketTool extends Tool {
         skills: bestMatch.skills
       });
 
+      // Add to ticket history before assignment
+      const { error: historyError } = await this.supabase
+        .from('ticket_history')
+        .insert({
+          ticket_id: this.config.ticketId,
+          changed_by: this.config.aiEmployeeId,
+          changes: {
+            type: 'smart_assignment',
+            employee: {
+              id: bestMatch.id,
+              name: bestMatch.name,
+              email: bestMatch.email
+            },
+            score: bestMatch.score,
+            requiredSkill,
+            matchedSkills: bestMatch.skills
+          },
+          created_at: new Date().toISOString()
+        });
+
+      if (historyError) {
+        console.error("[SmartAssignTicketTool] Error adding to history:", historyError);
+        // Don't throw, continue with assignment
+      }
+
       // Use the existing assign tool to make the assignment
       console.log("[SmartAssignTicketTool] Calling assign tool with email:", bestMatch.email);
       const result = await this.assignTool.call(bestMatch.email);
@@ -184,12 +222,17 @@ export class SmartAssignTicketTool extends Tool {
             matchScore: bestMatch.score,
             matchRole: bestMatch.role,
             matchSkills: bestMatch.skills,
-            requiredSkill
+            requiredSkill,
+            assignmentType: 'smart'
           }
         }
       });
     } catch (error) {
       console.error("[SmartAssignTicketTool] Error:", error);
+      if (error instanceof Error) {
+        console.error("[SmartAssignTicketTool] Error stack:", error.stack);
+      }
+      
       return JSON.stringify({
         success: false,
         error: error instanceof Error ? error.message : "An unknown error occurred",
