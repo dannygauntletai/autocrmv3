@@ -1,9 +1,15 @@
 import { BaseMessage } from 'langchain/schema';
 import { Tool } from 'langchain/tools';
 
-export interface TicketTool extends Tool {
+export interface BaseToolConfig {
+  supabaseUrl: string;
+  supabaseKey: string;
+  aiEmployeeId: string;
   ticketId: string;
-  action: 'read' | 'update' | 'comment';
+}
+
+export interface TicketTool extends Tool {
+  config: BaseToolConfig;
 }
 
 export interface MemoryTool extends Tool {
@@ -52,10 +58,10 @@ export interface AIEmployeeState {
   };
 }
 
-export type ModelType = 'gpt-4-turbo-preview' | 'gpt-3.5-turbo';
+export type ModelType = '4o-mini';
 
 export interface ModelConfig {
-  modelName: ModelType;
+  modelName: string;
   temperature: number;
 }
 
@@ -65,7 +71,33 @@ export const MODEL_CONFIGS: Record<'simple' | 'complex', ModelConfig> = {
     temperature: 0.3
   },
   complex: {
-    modelName: 'gpt-4-turbo-preview',
+    modelName: '4o-mini',
     temperature: 0.7
   }
-} as const; 
+} as const;
+
+export type AssignmentType = 'team' | 'employee';
+
+export interface AssignmentAction {
+  type: AssignmentType;
+  target: string;  // team name/id or employee email/id
+  reason?: string;
+}
+
+export interface AssignmentResult extends ToolResult {
+  data?: {
+    assignmentType: AssignmentType;
+    assignedTo: {
+      id: string;
+      name: string;
+      type: AssignmentType;
+    };
+  };
+}
+
+export interface SupportAgentConfig extends BaseToolConfig {
+  model?: ModelType;
+  temperature?: number;
+  openAiKey: string;
+  ticketId: string;
+} 

@@ -1,13 +1,21 @@
 import { ChatOpenAI } from "langchain/chat_models/openai";
 import { Tool } from "langchain/tools";
 import { initializeAgentExecutorWithOptions } from "langchain/agents";
-import { AgentStep } from "langchain/schema";
-import { BaseToolConfig } from "../tools/ticket/types.ts";
+import { AgentStep, BaseMessage, AIMessage, HumanMessage } from "langchain/schema";
+import { 
+  BaseToolConfig, 
+  MODEL_CONFIGS, 
+  ModelType,
+  AssignmentAction,
+  AssignmentType,
+  SupportAgentConfig as AgentConfig
+} from "../types.ts";
 import { 
   ReadTicketTool, 
   UpdateTicketStatusTool, 
   UpdateTicketPriorityTool,
   AssignTicketTool,
+  AssignTeamTool,
   AddInternalNoteTool,
   AddToKnowledgebaseTool
 } from "../tools/ticket/index.ts";
@@ -16,18 +24,15 @@ import { SearchTool } from "../tools/search.ts";
 import { MessageTool } from "../tools/message.ts";
 import { TicketAnalyzer } from "./ticketAnalyzer.ts";
 import { FunctionsAgent } from "./functionsAgent.ts";
-import { BaseMessage, AIMessage, HumanMessage } from "langchain/schema";
-import { MODEL_CONFIGS, ModelType } from "../types.ts";
 
 export interface SupportAgentConfig extends BaseToolConfig {
   openAiKey: string;
-  model?: string;
+  model?: ModelType;
   temperature?: number;
   ticketId: string;
   supabaseUrl: string;
   supabaseKey: string;
   aiEmployeeId: string;
-  operation?: string;
 }
 
 interface AgentResult {
@@ -51,14 +56,12 @@ export class SupportAgent {
   private tools: Tool[];
   private model: ChatOpenAI;
   private ticketAnalyzer: TicketAnalyzer;
-  private functionsAgent!: FunctionsAgent;
+  private functionsAgent: FunctionsAgent;
   private chatHistory: BaseMessage[] = [];
 
-  private constructor(
-    config: SupportAgentConfig,
-    functionsAgent: FunctionsAgent
-  ) {
+  constructor(config: SupportAgentConfig, functionsAgent: FunctionsAgent) {
     this.config = config;
+    this.functionsAgent = functionsAgent;
     
     // Initialize tools
     this.tools = [
@@ -66,6 +69,7 @@ export class SupportAgent {
       new UpdateTicketStatusTool(config),
       new UpdateTicketPriorityTool(config),
       new AssignTicketTool(config),
+      new AssignTeamTool(config),
       new AddInternalNoteTool(config),
       new AddToKnowledgebaseTool(config),
       new MemoryManagementTool(config.ticketId, config.supabaseUrl, config.supabaseKey),
@@ -77,15 +81,12 @@ export class SupportAgent {
     const modelConfig = MODEL_CONFIGS[this.determineModelComplexity()];
     this.model = new ChatOpenAI({
       openAIApiKey: config.openAiKey,
-      modelName: config.model || modelConfig.modelName,
+      modelName: modelConfig.modelName,
       temperature: config.temperature || modelConfig.temperature,
     });
 
     // Initialize YOLO mode analyzer
     this.ticketAnalyzer = new TicketAnalyzer(config);
-
-    // Set Functions Agent
-    this.functionsAgent = functionsAgent;
   }
 
   static async create(config: SupportAgentConfig): Promise<SupportAgent> {
@@ -94,6 +95,7 @@ export class SupportAgent {
       new UpdateTicketStatusTool(config),
       new UpdateTicketPriorityTool(config),
       new AssignTicketTool(config),
+      new AssignTeamTool(config),
       new AddInternalNoteTool(config),
       new AddToKnowledgebaseTool(config),
       new MemoryManagementTool(config.ticketId, config.supabaseUrl, config.supabaseKey),
@@ -160,6 +162,58 @@ export class SupportAgent {
     }
   }
 
+  async handleAssignment(input: string): Promise<string> {
+    try {
+      // Parse the input to determine assignment type
+      const isTeamAssignment = input.toLowerCase().includes('team:') || 
+                              input.toLowerCase().includes('team=') ||
+                              input.toLowerCase().includes('team/') ||
+                              input.toLowerCase().includes('_team');
+
+      const action: AssignmentAction = {
+        type: isTeamAssignment ? 'team' : 'employee',
+        target: input
+          .replace(/^(team|employee)[:=-]/i, '')  // Remove prefix if present
+          .replace(/^(team|employee)\//i, '')     // Remove forward slash prefix if present
+          .replace(/_team$/i, '')                 // Remove _team suffix if present
+          .trim()
+      };
+
+      // Format the input as a proper JSON string for the appropriate tool
+      const formattedInput = JSON.stringify(action);
+      
+      // Log the assignment attempt
+      console.log("[SupportAgent] Attempting assignment:", {
+        originalInput: input,
+        parsedAction: action,
+        formattedInput
+      });
+
+      // Use the appropriate tool based on assignment type
+      const toolName = action.type === 'team' ? 'assign_team' : 'assign_ticket';
+      console.log(`[SupportAgent] Using ${toolName} tool`);
+
+      const result = await this.functionsAgent.processInput(
+        `${toolName} ${formattedInput}`
+      );
+
+      return JSON.stringify(result);
+    } catch (error) {
+      console.error("[SupportAgent] Assignment failed:", error);
+      return JSON.stringify({
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to handle assignment",
+        context: {
+          timestamp: Date.now(),
+          metadata: {
+            error: true,
+            errorType: error instanceof Error ? error.name : 'Unknown'
+          }
+        }
+      });
+    }
+  }
+
   private determineModelComplexity(): 'simple' | 'complex' {
     // Simple operations:
     // - Reading ticket info
@@ -172,7 +226,6 @@ export class SupportAgent {
     // - Multi-step reasoning
     // - Customer communication
     // - Search and analysis
-    const operation = this.config.operation?.toLowerCase() || '';
-    return simpleOperations.some(op => operation.includes(op)) ? 'simple' : 'complex';
+    return 'complex'; // Always use complex model for support agent
   }
 } 

@@ -15,11 +15,15 @@ type Employee = Database['public']['Tables']['employees']['Row'] & {
     assigned_tickets_count: number | null;
     avg_resolution_time: number | null;
   }>;
+  employee_skills?: Array<{
+    skill_name: string;
+    proficiency_level: number;
+  }>;
 };
 
 export class SmartAssignTicketTool extends Tool {
   name = "smart_assign_ticket";
-  description = "Intelligently assign a ticket to the best employee based on workload and performance metrics. Use this when you want to find the best employee match for a ticket.";
+  description = "Intelligently assign a ticket to the best employee based on skills, workload and performance metrics. Input can be a specific skill requirement or general context for matching.";
   
   override returnDirect = false;
   
@@ -67,7 +71,7 @@ export class SmartAssignTicketTool extends Tool {
 
       console.log("[SmartAssignTicketTool] Analyzing ticket content for assignment");
 
-      // Get all employees with their metrics
+      // Get all employees with their metrics and skills
       const employeesResponse = await this.supabase
         .from('employees')
         .select(`
@@ -75,6 +79,10 @@ export class SmartAssignTicketTool extends Tool {
           employee_metrics (
             assigned_tickets_count,
             avg_resolution_time
+          ),
+          employee_skills (
+            skill_name,
+            proficiency_level
           )
         `);
 
@@ -84,12 +92,37 @@ export class SmartAssignTicketTool extends Tool {
 
       const employees = employeesResponse.data as unknown as Employee[];
 
+      // Determine if input is a specific skill requirement
+      const requiredSkill = parsedInput.toLowerCase().trim();
+      console.log("[SmartAssignTicketTool] Required skill or context:", requiredSkill);
+
       // Score each employee based on:
-      // 1. Current workload
-      // 2. Average resolution time
-      // 3. Role suitability
+      // 1. Skill match
+      // 2. Current workload
+      // 3. Average resolution time
+      // 4. Role suitability
       const scoredEmployees = employees.map(employee => {
         let score = 100; // Start with base score
+        
+        // Check for skill match if a specific skill is required
+        const hasSkill = employee.employee_skills?.some(skill => 
+          skill.skill_name.toLowerCase().includes(requiredSkill) ||
+          requiredSkill.includes(skill.skill_name.toLowerCase())
+        );
+
+        // If a specific skill is required and employee doesn't have it, significantly reduce score
+        if (requiredSkill && !hasSkill) {
+          score *= 0.1; // Heavily penalize missing required skill
+        } else if (hasSkill) {
+          // Boost score based on skill proficiency
+          const skillMatch = employee.employee_skills?.find(skill => 
+            skill.skill_name.toLowerCase().includes(requiredSkill) ||
+            requiredSkill.includes(skill.skill_name.toLowerCase())
+          );
+          if (skillMatch) {
+            score *= (1 + skillMatch.proficiency_level * 0.5);
+          }
+        }
         
         const metrics = employee.employee_metrics?.[0];
         if (metrics) {
@@ -114,12 +147,16 @@ export class SmartAssignTicketTool extends Tool {
           email: employee.email,
           role: employee.role,
           metrics: employee.employee_metrics,
-          score
+          skills: employee.employee_skills,
+          score,
+          hasRequiredSkill: hasSkill
         };
       });
 
       // Sort by score and get the best match
-      const bestMatch = scoredEmployees.sort((a, b) => b.score - a.score)[0];
+      const bestMatch = scoredEmployees
+        .filter(e => requiredSkill ? e.hasRequiredSkill : true) // Only consider employees with required skill if specified
+        .sort((a, b) => b.score - a.score)[0];
 
       if (!bestMatch) {
         throw new Error('No suitable employee found for assignment');
@@ -129,7 +166,8 @@ export class SmartAssignTicketTool extends Tool {
         name: bestMatch.name,
         email: bestMatch.email,
         score: bestMatch.score,
-        role: bestMatch.role
+        role: bestMatch.role,
+        skills: bestMatch.skills
       });
 
       // Use the existing assign tool to make the assignment
@@ -145,7 +183,8 @@ export class SmartAssignTicketTool extends Tool {
             ...assignResult.context.metadata,
             matchScore: bestMatch.score,
             matchRole: bestMatch.role,
-            metrics: bestMatch.metrics
+            matchSkills: bestMatch.skills,
+            requiredSkill
           }
         }
       });

@@ -19,12 +19,21 @@ export class UpdateTicketStatusTool extends Tool {
   }
 
   /** @ignore */
-  async _call(input: string | { input: string }): Promise<string> {
+  async _call(input: string | { input: string } | undefined): Promise<string> {
     try {
       console.log("[UpdateTicketStatusTool] Received input:", input);
       
+      if (!input) {
+        throw new Error("Input is required. Must be a JSON string containing a 'status' field or a valid status string.");
+      }
+
       // Handle both string and object input
       const inputStr = typeof input === 'string' ? input : input.input;
+      
+      if (!inputStr) {
+        throw new Error("Input string is required. Must be a JSON string containing a 'status' field or a valid status string.");
+      }
+
       console.log("[UpdateTicketStatusTool] Parsed input string:", inputStr);
       
       // First try to parse as JSON
