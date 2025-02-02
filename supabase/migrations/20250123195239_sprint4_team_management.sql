@@ -49,3 +49,8 @@ CREATE TRIGGER set_timestamp_teams
     BEFORE UPDATE ON teams
     FOR EACH ROW
     EXECUTE PROCEDURE trigger_set_timestamp();
+
+-- Insert AI agent employee
+INSERT INTO employees (id, name, email, role, status)
+VALUES ('a2b7c987-6543-4321-8901-234567890123', 'AutoCRM AI', 'ai@autocrm.app', 'agent', 'active')
+ON CONFLICT (email) DO NOTHING;

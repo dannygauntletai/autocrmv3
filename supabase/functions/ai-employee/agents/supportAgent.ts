@@ -126,7 +126,11 @@ export class SupportAgent {
           throw new Error("Failed to analyze ticket: " + analysis.error);
         }
 
-        // No need for additional LLM calls, the analysis already includes actions taken
+        // Filter out execution messages from the output
+        if (analysis.output) {
+          analysis.output = analysis.output.replace(/Executing Action \d+\.\.\.(\n|\r\n)?/g, '');
+        }
+
         return analysis;
       }
 

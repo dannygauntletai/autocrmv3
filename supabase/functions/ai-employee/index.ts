@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
       ticketId,
       supabaseUrl,
       supabaseKey: supabaseAnonKey,
-      aiEmployeeId: '00000000-0000-0000-0000-000000000000',
+      aiEmployeeId: 'a2b7c987-6543-4321-8901-234567890123',
       employeeId: config?.employeeId,
       openAiKey: openAIApiKey,
       model: 'gpt-4-turbo-preview',

@@ -91,28 +91,29 @@ export class FunctionsAgent {
 
   async processInput(input: string, chatHistory: BaseMessage[] = []): Promise<AgentResult> {
     try {
-      const result = await this.executor.invoke({
-        input,
-        chat_history: chatHistory,
-      });
+      // Use the existing executor instead of creating a new one
+      const result = await this.executor.call({ input, chat_history: chatHistory });
+
+      // Clean up the output by removing execution messages
+      if (result.output) {
+        result.output = result.output
+          .replace(/Executing Action \d+\.\.\.(\n|\r\n)?/g, '')
+          .replace(/Agent stopped due to max iterations\./g, '');
+      }
 
       return {
         success: true,
-        output: result.output + (result.output.includes('max iterations') ? 
-          '\n\nPartial actions completed before max iterations:\n' + 
-          result.intermediateSteps?.map((step: AgentStep) => 
-            `- Tool: ${step.action.tool}\n  Input: ${step.action.toolInput}\n  Result: ${step.observation}`
-          ).join('\n') : ''),
+        output: result.output,
         steps: result.intermediateSteps,
         toolCalls: result.intermediateSteps?.map((step: AgentStep) => ({
           tool: step.action.tool,
           input: step.action.toolInput,
-          output: step.observation,
+          output: step.observation
         })),
         context: {
           ticketId: this.config.ticketId,
-          timestamp: Date.now(),
-        },
+          timestamp: Date.now()
+        }
       };
     } catch (error) {
       // Check if error is due to max iterations and include partial results
@@ -121,10 +122,9 @@ export class FunctionsAgent {
       if (isMaxIterations && steps?.length) {
         return {
           success: true,
-          output: "Reached maximum iterations. Here are the actions completed:\n" +
-            steps.map((step: AgentStep) => 
-              `- Tool: ${step.action.tool}\n  Input: ${step.action.toolInput}\n  Result: ${step.observation}`
-            ).join('\n'),
+          output: steps.map((step: AgentStep) => 
+            `${step.observation}`
+          ).join('\n'),
           steps: steps,
           toolCalls: steps.map((step: AgentStep) => ({
             tool: step.action.tool,

@@ -16,7 +16,7 @@ export class TicketAssignmentTool extends Tool {
     ticketId: string,
     supabaseUrl: string,
     supabaseKey: string,
-    aiEmployeeId = '00000000-0000-0000-0000-000000000000'
+    aiEmployeeId = 'a2b7c987-6543-4321-8901-234567890123'
   ) {
     super();
     this.ticketId = ticketId;

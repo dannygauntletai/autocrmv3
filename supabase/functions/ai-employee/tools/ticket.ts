@@ -42,7 +42,7 @@ For assigning tickets, use 'assign' followed by the agent's email.`;
   private supabaseUrl: string;
   private supabaseKey: string;
   private supabase;
-  private aiEmployeeId = '00000000-0000-0000-0000-000000000000'; // Default AI employee UUID
+  private aiEmployeeId = 'a2b7c987-6543-4321-8901-234567890123'; // AutoCRM AI UUID
   private assignmentTool: TicketAssignmentTool;
 
   constructor(
