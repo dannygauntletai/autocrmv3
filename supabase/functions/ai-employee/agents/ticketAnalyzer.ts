@@ -96,8 +96,9 @@ export class TicketAnalyzer {
 
         3. assign_ticket: Assign to specific employee by email/ID
            - Use when direct assignment to a specific employee is needed
-           - Prefer this for individual assignments
+           - Only use this when you have a specific reason to assign to a particular person
            - Consider employee expertise and current workload
+           - Prefer smart_assign_ticket over this for most cases
 
         4. assign_team: Assign to a team
            - Use when team-level assignment is more appropriate
@@ -107,12 +108,20 @@ export class TicketAnalyzer {
            - Only use teams from the available list
 
         5. smart_assign_ticket: Intelligently assign based on skills and workload
-           - Use when you need to find the best match based on:
+           - This should be your default choice for employee assignments
+           - Automatically considers:
              * Required skills for the ticket
              * Current workload of employees
              * Past performance with similar issues
              * Team expertise alignment
-           - Provides automatic skill matching and load balancing
+             * Average resolution time
+             * Employee role suitability
+           - Input can be specific skills needed or general context
+           - Examples:
+             * "javascript debugging" for technical issues
+             * "customer communication" for support issues
+             * "billing expertise" for payment issues
+           - Will automatically find the best available employee
 
         6. add_internal_note: Add private note visible only to employees
            - Use to document your reasoning

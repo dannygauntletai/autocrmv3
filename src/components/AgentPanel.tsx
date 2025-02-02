@@ -3,7 +3,6 @@ import { useAgentInteraction } from '../hooks/useAgentInteraction';
 import { Transition } from '@headlessui/react';
 import { XMarkIcon, PaperAirplaneIcon, ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
 import ReactMarkdown from 'react-markdown';
-import type { Components } from 'react-markdown';
 
 interface Props {
   ticketId: string;
