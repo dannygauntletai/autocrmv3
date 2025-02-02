@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 
 export class UpdateTicketStatusTool extends Tool {
   name = "update_ticket_status";
-  description = "Update the status of a ticket. Input must be a JSON string containing a 'status' field with one of these values: new, open, pending, resolved, closed. Example: {\"status\": \"open\"}";
+  description = "Update the status of a ticket. Input can be either: 1) A JSON string like {\"status\": \"open\"}, or 2) A direct status string like \"open\". Valid status values are: open, pending, resolved.";
   
   override returnDirect = false;
   
@@ -24,42 +24,40 @@ export class UpdateTicketStatusTool extends Tool {
       console.log("[UpdateTicketStatusTool] Received input:", input);
       
       if (!input) {
-        throw new Error("Input is required. Must be a JSON string containing a 'status' field or a valid status string.");
+        throw new Error("Input is required. Must be either a JSON string like {\"status\": \"open\"} or a valid status string like \"open\"");
       }
 
       // Handle both string and object input
       const inputStr = typeof input === 'string' ? input : input.input;
       
-      if (!inputStr) {
-        throw new Error("Input string is required. Must be a JSON string containing a 'status' field or a valid status string.");
+      if (!inputStr || inputStr.trim() === '') {
+        throw new Error("Input string cannot be empty. Must be either a JSON string like {\"status\": \"open\"} or a valid status string like \"open\"");
       }
 
       console.log("[UpdateTicketStatusTool] Parsed input string:", inputStr);
       
+      const validStatuses: TicketStatus[] = ['open', 'pending', 'resolved'];
+      let status: string;
+
       // First try to parse as JSON
-      let parsedInput: { status: string };
       try {
-        parsedInput = JSON.parse(inputStr);
+        const parsedInput = JSON.parse(inputStr);
         console.log("[UpdateTicketStatusTool] Parsed JSON:", parsedInput);
         
         if (!parsedInput.status) {
-          throw new Error("Input must contain a 'status' field");
+          throw new Error("JSON input must contain a 'status' field. Example: {\"status\": \"open\"}");
         }
+        status = parsedInput.status;
       } catch (parseError) {
-        console.log("[UpdateTicketStatusTool] JSON parse error:", parseError);
-        // If JSON parsing fails, check if input is a valid status string
-        const rawStatus = inputStr.trim().toLowerCase();
-        console.log("[UpdateTicketStatusTool] Trying raw status:", rawStatus);
-        
-        const validStatuses: TicketStatus[] = ['new', 'open', 'pending', 'resolved', 'closed'];
-        if (validStatuses.includes(rawStatus as TicketStatus)) {
-          parsedInput = { status: rawStatus };
-        } else {
-          throw new Error(`Invalid status. Must be one of: ${validStatuses.join(', ')}. Input should be a JSON string like: {"status": "open"}`);
-        }
+        // If JSON parsing fails, try using input directly as status
+        status = inputStr.trim().toLowerCase();
       }
 
-      const status = parsedInput.status.toLowerCase() as TicketStatus;
+      // Validate the status value
+      if (!validStatuses.includes(status as TicketStatus)) {
+        throw new Error(`Invalid status: "${status}". Must be one of: ${validStatuses.join(', ')}. Example input: {"status": "open"}`);
+      }
+
       console.log("[UpdateTicketStatusTool] Final status to update:", status);
       
       const result = await this.updateStatus(status);
@@ -92,7 +90,7 @@ export class UpdateTicketStatusTool extends Tool {
   private async updateStatus(status: string): Promise<TicketToolResult> {
     try {
       // Validate status
-      const validStatuses: TicketStatus[] = ['new', 'open', 'pending', 'resolved', 'closed'];
+      const validStatuses: TicketStatus[] = ['open', 'pending', 'resolved'];
       if (!validStatuses.includes(status as TicketStatus)) {
         throw new Error(`Invalid status: ${status}. Must be one of: ${validStatuses.join(', ')}`);
       }

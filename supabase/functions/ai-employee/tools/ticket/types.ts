@@ -33,7 +33,7 @@ export interface BaseToolConfig {
   employeeId?: string;
 }
 
-export type TicketStatus = 'new' | 'open' | 'pending' | 'resolved' | 'closed';
+export type TicketStatus = 'open' | 'pending' | 'resolved';
 export type TicketPriority = 'low' | 'medium' | 'high';
 
 export interface TicketToolResult extends ToolResult {
