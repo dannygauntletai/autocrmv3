@@ -2,6 +2,8 @@ import { useState, useRef, useEffect, Fragment } from 'react';
 import { useAgentInteraction } from '../hooks/useAgentInteraction';
 import { Transition } from '@headlessui/react';
 import { XMarkIcon, PaperAirplaneIcon, ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
+import ReactMarkdown from 'react-markdown';
+import type { Components } from 'react-markdown';
 
 interface Props {
   ticketId: string;
@@ -95,7 +97,11 @@ export function AgentPanel({ ticketId, onClose }: Props) {
                           : 'bg-white text-gray-900'
                       }`}
                     >
-                      <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>
+                      <div className={`prose prose-sm ${msg.role === 'user' ? 'prose-invert' : ''} max-w-none markdown-content`}>
+                        <ReactMarkdown>
+                          {msg.content}
+                        </ReactMarkdown>
+                      </div>
                     </div>
                   </div>
                 ))}
