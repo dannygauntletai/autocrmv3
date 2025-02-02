@@ -1,5 +1,6 @@
 import { BaseMessage } from 'langchain/schema';
 import { Tool } from 'langchain/tools';
+import { AgentStep } from 'langchain/schema';
 
 export interface BaseToolConfig {
   supabaseUrl: string;
@@ -100,4 +101,27 @@ export interface SupportAgentConfig extends BaseToolConfig {
   temperature?: number;
   openAiKey: string;
   ticketId: string;
+}
+
+export interface TicketAnalyzerConfig extends BaseToolConfig {
+  openAiKey: string;
+  model?: string;
+  temperature?: number;
+  langSmithProjectName?: string;
+}
+
+export interface AnalyzerResult {
+  success: boolean;
+  output?: string;
+  steps?: AgentStep[];
+  toolCalls?: Array<{
+    tool: string;
+    input: string;
+    output: string;
+  }>;
+  error?: string;
+  context?: {
+    ticketId: string;
+    timestamp: number;
+  };
 } 

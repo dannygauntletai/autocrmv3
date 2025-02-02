@@ -114,28 +114,20 @@ export class SupportAgent {
 
       // Check for YOLO mode
       if (userInput.toLowerCase().includes('yolo')) {
-        messages.push("YOLO mode activated - implementing reason + act structure");
+        messages.push("YOLO mode activated - implementing autonomous analysis");
         
-        // Step 1: Analyze the ticket first
-        const analysis = await this.ticketAnalyzer.analyze();
+        // Use the ticket analyzer directly with the functions agent's tools
+        const analysis = await this.ticketAnalyzer.analyzeWithTools(
+          this.tools,
+          this.functionsAgent
+        );
+
         if (!analysis.success) {
           throw new Error("Failed to analyze ticket: " + analysis.error);
         }
-        messages.push("Initial analysis complete");
 
-        // Step 2: Use Functions Agent to handle the analysis results
-        const result = await this.functionsAgent.processInput(
-          `Based on this ticket analysis, determine and execute appropriate actions: ${analysis.output}`,
-          this.chatHistory
-        );
-
-        // Update chat history with the interaction
-        if (result.success && result.output) {
-          this.chatHistory.push(new HumanMessage(userInput));
-          this.chatHistory.push(new AIMessage(result.output));
-        }
-
-        return result;
+        // No need for additional LLM calls, the analysis already includes actions taken
+        return analysis;
       }
 
       // For normal operations, use Functions Agent directly

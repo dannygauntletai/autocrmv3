@@ -1,8 +1,13 @@
 import { ChatOpenAI } from "langchain/chat_models/openai";
 import { Tool } from "langchain/tools";
-import { initializeAgentExecutorWithOptions } from "langchain/agents";
 import { AgentStep } from "langchain/schema";
-import { BaseToolConfig } from "../tools/ticket/types.ts";
+import { 
+  BaseToolConfig, 
+  MODEL_CONFIGS,
+  TicketAnalyzerConfig,
+  AnalyzerResult,
+  ToolResult
+} from "../types.ts";
 import { 
   ReadTicketTool, 
   UpdateTicketStatusTool, 
@@ -11,45 +16,23 @@ import {
   AddInternalNoteTool 
 } from "../tools/ticket/index.ts";
 import { createClient } from "@supabase/supabase-js";
-import { SupportAgentConfig } from "./supportAgent.ts";
-import { MODEL_CONFIGS } from "../types.ts";
-
-export interface TicketAnalyzerConfig extends BaseToolConfig {
-  openAiKey: string;
-  model?: string;
-  temperature?: number;
-  langSmithProjectName?: string;
-}
-
-interface AnalyzerResult {
-  success: boolean;
-  output?: string;
-  steps?: AgentStep[];
-  toolCalls?: Array<{
-    tool: string;
-    input: string;
-    output: string;
-  }>;
-  error?: string;
-  context?: {
-    ticketId: string;
-    timestamp: number;
-  };
-}
+import { FunctionsAgent } from "./functionsAgent.ts";
 
 export class TicketAnalyzer {
   private config: TicketAnalyzerConfig;
   private tools: Tool[];
   private model: ChatOpenAI;
   private supabase;
+  private readTicketTool: ReadTicketTool;
 
   constructor(config: TicketAnalyzerConfig) {
     this.config = config;
     this.supabase = createClient(config.supabaseUrl, config.supabaseKey);
     
-    // Initialize tools
+    // Initialize tools with proper typing
+    this.readTicketTool = new ReadTicketTool(config);
     this.tools = [
-      new ReadTicketTool(config),
+      this.readTicketTool,
       new UpdateTicketStatusTool(config),
       new UpdateTicketPriorityTool(config),
       new AssignTicketTool(config),
@@ -70,30 +53,16 @@ export class TicketAnalyzer {
     return 'complex';
   }
 
-  async analyze(): Promise<AnalyzerResult> {
+  async analyzeWithTools(tools: Tool[], functionsAgent: FunctionsAgent): Promise<AnalyzerResult> {
     try {
-      const messages: string[] = [];
-      messages.push("Starting autonomous analysis for ticket: " + this.config.ticketId);
-      
       // Step 1: Gather ticket data for analysis
-      messages.push("Gathering ticket data for analysis...");
       const ticketData = await this.readTicket();
       
       if (!ticketData.success || !ticketData.data?.ticket) {
         throw new Error(`Failed to read ticket data for analysis. Ticket ID: ${this.config.ticketId}`);
       }
 
-      messages.push("Successfully retrieved ticket data");
-
-      // Step 2: Analyze the ticket and determine required actions
-      messages.push("Analyzing ticket to determine required actions...");
-      const executor = await initializeAgentExecutorWithOptions([this.tools[0]], this.model, {
-        agentType: "openai-functions",
-        verbose: true,
-        maxIterations: 10,
-        returnIntermediateSteps: true
-      });
-
+      // Step 2: Use the functions agent to analyze and execute actions
       const analysisTask = `
         Analyze this ticket and determine what actions need to be taken. Consider:
         1. Ticket priority based on content and customer impact
@@ -101,85 +70,27 @@ export class TicketAnalyzer {
         3. Current status and if it needs updating
         4. Whether it needs reassignment
 
-        Provide your analysis in a structured format:
-        {
-          "reasoning": "explanation of your analysis",
-          "actions": [
-            {
-              "tool": "name of the tool to use",
-              "reason": "why this action is needed",
-              "input": "what input to provide to the tool"
-            }
-          ]
-        }
+        Then, execute the necessary actions using the available tools.
+        
+        Ticket Data:
+        ${JSON.stringify(ticketData.data.ticket, null, 2)}
       `;
 
-      const analysis = await executor.call({ input: analysisTask });
-      let actionPlan;
-      try {
-        actionPlan = JSON.parse(analysis.output);
-      } catch (e) {
-        messages.push("Failed to parse analysis output, using raw output");
-        // Check if error is due to max iterations
-        const isMaxIterations = analysis.output.includes('max iterations');
-        actionPlan = {
-          reasoning: isMaxIterations ? 
-            "Analysis stopped due to max iterations. Here are the partial results:" : 
-            "Failed to structure analysis",
-          actions: isMaxIterations ? 
-            analysis.intermediateSteps?.map((step: AgentStep) => ({
-              tool: step.action.tool,
-              reason: "Action from partial analysis",
-              input: step.action.toolInput
-            })) || [] : []
-        };
-      }
+      // Use the functions agent to both analyze and execute actions
+      const result = await functionsAgent.processInput(analysisTask);
 
-      messages.push("Analysis complete. Reasoning: " + actionPlan.reasoning);
-
-      // Step 3: Execute the determined actions
-      messages.push("Executing determined actions...");
-      const toolResults = [];
-      
-      for (const action of actionPlan.actions) {
-        const tool = this.tools.find(t => t.name === action.tool);
-        if (!tool) {
-          messages.push(`Warning: Tool ${action.tool} not found, skipping action`);
-          continue;
-        }
-
-        messages.push(`Executing action: ${action.tool} - ${action.reason}`);
-        try {
-          const result = await tool.call(action.input);
-          toolResults.push({
-            tool: action.tool,
-            input: action.input,
-            output: result,
-            reason: action.reason
-          });
-          messages.push(`Action completed successfully`);
-        } catch (error) {
-          messages.push(`Failed to execute action: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-      }
-
-      // Step 4: Summarize actions taken
-      const summary = `
-        Analysis complete for ticket ${this.config.ticketId}
-        
-        Reasoning:
-        ${actionPlan.reasoning}
-        
-        Actions Taken:
-        ${toolResults.map(result => 
-          `- ${result.tool}: ${result.reason}\n  Result: ${result.output}`
-        ).join('\n')}
-      `;
+      // Log the completion of analysis
+      await this.addMessage(`Analysis completed for ticket ${this.config.ticketId}`, true);
 
       return {
         success: true,
-        output: summary,
-        toolCalls: toolResults,
+        output: result.output,
+        steps: result.intermediateSteps,
+        toolCalls: result.toolCalls?.map(call => ({
+          tool: call.tool,
+          input: call.input,
+          output: call.output
+        })),
         context: {
           ticketId: this.config.ticketId,
           timestamp: Date.now()
@@ -188,6 +99,10 @@ export class TicketAnalyzer {
 
     } catch (error) {
       console.error("[TicketAnalyzer] Error during analysis:", error);
+      
+      // Log the error internally
+      await this.addMessage(`Analysis failed: ${error instanceof Error ? error.message : "Unknown error"}`, true);
+      
       return {
         success: false,
         error: error instanceof Error ? error.message : "An unknown error occurred",
@@ -199,13 +114,9 @@ export class TicketAnalyzer {
     }
   }
 
-  private async readTicket() {
+  private async readTicket(): Promise<ToolResult> {
     try {
-      const readTicketTool = this.tools.find(tool => tool.name === "read_ticket") as ReadTicketTool;
-      if (!readTicketTool) {
-        throw new Error("ReadTicketTool not found in tools array");
-      }
-      const result = await readTicketTool._call('');
+      const result = await this.readTicketTool._call('');
       return JSON.parse(result);
     } catch (error) {
       console.error("[TicketAnalyzer] Error reading ticket:", error);
@@ -213,7 +124,7 @@ export class TicketAnalyzer {
     }
   }
 
-  private async addMessage(message: string, isInternal: boolean) {
+  private async addMessage(message: string, isInternal: boolean): Promise<void> {
     try {
       const { error } = await this.supabase
         .from('ticket_messages')
