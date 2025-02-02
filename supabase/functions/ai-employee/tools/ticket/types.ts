@@ -34,7 +34,7 @@ export interface BaseToolConfig {
 }
 
 export type TicketStatus = 'new' | 'open' | 'pending' | 'resolved' | 'closed';
-export type TicketPriority = 'low' | 'medium' | 'high' | 'urgent';
+export type TicketPriority = 'low' | 'medium' | 'high';
 
 export interface TicketToolResult extends ToolResult {
   context: {

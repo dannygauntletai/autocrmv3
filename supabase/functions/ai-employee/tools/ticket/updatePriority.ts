@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 
 export class UpdateTicketPriorityTool extends Tool {
   name = "update_ticket_priority";
-  description = "Update the priority of a ticket. Valid priorities are: low, medium, high, urgent.";
+  description = "Update the priority of a ticket. Valid priorities are: low, medium, high. For urgent matters, use high priority and communicate urgency in notes.";
   
   private config: BaseToolConfig;
   private supabase;
@@ -64,9 +64,11 @@ export class UpdateTicketPriorityTool extends Tool {
   private async updatePriority(priority: string, reason?: string): Promise<TicketToolResult> {
     try {
       // Validate priority
-      const validPriorities: TicketPriority[] = ['low', 'medium', 'high', 'urgent'];
-      if (!validPriorities.includes(priority as TicketPriority)) {
-        throw new Error(`Invalid priority: ${priority}. Must be one of: ${validPriorities.join(', ')}`);
+      const validPriorities: TicketPriority[] = ['low', 'medium', 'high'];
+      const normalizedPriority = priority.toLowerCase();
+      
+      if (!validPriorities.includes(normalizedPriority as TicketPriority)) {
+        throw new Error(`Invalid priority: ${priority}. Must be one of: ${validPriorities.join(', ')}. For urgent matters, use 'high' priority and communicate urgency in notes.`);
       }
 
       console.log("[UpdateTicketPriorityTool] Getting current ticket priority");
@@ -96,7 +98,7 @@ export class UpdateTicketPriorityTool extends Tool {
       const { data: updatedTicket, error: updateError } = await this.supabase
         .from('tickets')
         .update({ 
-          priority,
+          priority: normalizedPriority,
           updated_at: new Date().toISOString()
         })
         .eq('id', this.config.ticketId)
@@ -121,7 +123,7 @@ export class UpdateTicketPriorityTool extends Tool {
           changes: {
             priority: {
               old: oldPriority,
-              new: priority
+              new: normalizedPriority
             },
             reason: reason || 'AI Employee update'
           },
@@ -142,7 +144,7 @@ export class UpdateTicketPriorityTool extends Tool {
           timestamp: Date.now(),
           metadata: {
             oldPriority,
-            newPriority: priority,
+            newPriority: normalizedPriority,
             reason,
             updatedVia: 'supabase-client'
           }

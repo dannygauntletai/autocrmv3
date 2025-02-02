@@ -22,18 +22,16 @@ export class AddInternalNoteTool extends Tool {
       
       // Parse the input as JSON if it's a JSON string
       let note: string;
-      let metadata: Record<string, any> = {};
       
       try {
         const parsed = JSON.parse(input);
         note = parsed.note || parsed.message || parsed;
-        metadata = parsed.metadata || {};
       } catch {
         // If not JSON, use the raw input
         note = input.trim();
       }
 
-      console.log("[AddInternalNoteTool] Parsed note:", { note, metadata });
+      console.log("[AddInternalNoteTool] Parsed note:", { note });
 
       if (!note || typeof note !== 'string' || note.trim().length === 0) {
         throw new Error('Note content is required and must be a non-empty string');
@@ -44,7 +42,7 @@ export class AddInternalNoteTool extends Tool {
         throw new Error('Note content is too long. Maximum length is 10000 characters.');
       }
 
-      const result = await this.addNote(note.trim(), metadata);
+      const result = await this.addNote(note.trim());
       console.log("[AddInternalNoteTool] Add note result:", result);
       
       return JSON.stringify(result);
@@ -62,6 +60,8 @@ export class AddInternalNoteTool extends Tool {
           userId: this.config.aiEmployeeId,
           timestamp: Date.now(),
           metadata: {
+            source: 'ai_employee',
+            messageType: 'internal_note',
             error: true,
             errorType: error instanceof Error ? error.name : 'Unknown',
             errorStack: error instanceof Error ? error.stack : undefined
@@ -71,7 +71,7 @@ export class AddInternalNoteTool extends Tool {
     }
   }
 
-  private async addNote(note: string, metadata: Record<string, any> = {}): Promise<TicketToolResult> {
+  private async addNote(note: string): Promise<TicketToolResult> {
     try {
       console.log("[AddInternalNoteTool] Adding internal note");
       
@@ -84,11 +84,6 @@ export class AddInternalNoteTool extends Tool {
           sender_type: 'employee',
           sender_id: this.config.employeeId || this.config.aiEmployeeId,
           is_internal: true,
-          metadata: {
-            ...metadata,
-            source: 'ai_employee',
-            timestamp: new Date().toISOString()
-          },
           created_at: new Date().toISOString()
         })
         .select()
@@ -99,51 +94,25 @@ export class AddInternalNoteTool extends Tool {
         throw messageError;
       }
 
-      if (!message) {
-        throw new Error('Failed to create internal note');
-      }
-
-      console.log("[AddInternalNoteTool] Adding to ticket history");
-      
-      // Add to ticket history
-      const { error: historyError } = await this.supabase
-        .from('ticket_history')
-        .insert({
-          ticket_id: this.config.ticketId,
-          changed_by: this.config.employeeId || this.config.aiEmployeeId,
-          changes: {
-            type: 'internal_note',
-            note: {
-              id: message.id,
-              content: note
-            },
-            metadata
-          },
-          created_at: new Date().toISOString()
-        });
-
-      if (historyError) {
-        console.error("[AddInternalNoteTool] History error:", historyError);
-        // Don't throw here, as the note was successfully added
-      }
-
       return {
         success: true,
-        data: message,
+        data: {
+          message: message,
+          ticketId: this.config.ticketId
+        },
         context: {
           ticketId: this.config.ticketId,
           userId: this.config.employeeId || this.config.aiEmployeeId,
           timestamp: Date.now(),
           metadata: {
-            messageType: 'internal',
-            messageId: message.id,
-            ...metadata
+            source: 'ai_employee',
+            messageType: 'internal_note'
           }
         }
       };
     } catch (error) {
-      console.error("[AddInternalNoteTool] Add note error:", error);
-      throw error; // Re-throw to be handled by the main try-catch
+      console.error("[AddInternalNoteTool] Error adding note:", error);
+      throw error;
     }
   }
 } 

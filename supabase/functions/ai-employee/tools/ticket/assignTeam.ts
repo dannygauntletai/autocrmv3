@@ -22,7 +22,7 @@ type TeamTicketAssignment = {
 
 export class AssignTeamTool extends Tool {
   name = "assign_team";
-  description = "Assign a ticket to a team. Input should be a JSON string containing {type: 'team', target: string, reason?: string}. Available teams are: technical_support, customer_success, product_development, operations.";
+  description = "Assign a ticket to a team. Input should be a JSON string containing {type: 'team', target: string, reason?: string}. Available teams are: General Support, Technical Support.";
   
   override returnDirect = false;
   
