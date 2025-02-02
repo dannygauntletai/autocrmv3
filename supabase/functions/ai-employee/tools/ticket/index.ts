@@ -5,6 +5,7 @@ export * from './assignTicket.ts';
 export * from './assignTeam.ts';
 export * from './addInternalNote.ts';
 export * from './addToKnowledgebase.ts';
+export * from './smartAssign.ts';
 export * from './types.ts';
 
 // Re-export common types and tools

@@ -17,10 +17,9 @@ type Employee = Database['public']['Tables']['employees']['Row'] & {
     resolved_tickets_count: number | null;
     satisfaction_score: number | null;
   }>;
-  employee_skills?: Array<{
-    skill_name: string;
-    proficiency_level: number;
-  }>;
+  employee_skills: Array<{
+    skills: Record<string, number>;
+  }> | null;
   status: 'pending' | 'active' | 'inactive';
 };
 
@@ -80,109 +79,111 @@ export class SmartAssignTicketTool extends Tool {
 
       console.log("[SmartAssignTicketTool] Analyzing ticket content for assignment");
 
-      // Get all employees with their metrics and skills
+      // Get all employees with their skills
       console.log("[SmartAssignTicketTool] Fetching employee data");
-      const employeesResponse = await this.supabase
+      const { data: employeesResponse, error: employeesError } = await this.supabase
         .from('employees')
         .select(`
           *,
-          employee_metrics (
-            assigned_tickets_count,
-            avg_resolution_time,
-            resolved_tickets_count,
-            satisfaction_score
-          ),
           employee_skills (
-            skill_name,
-            proficiency_level
+            skills
           )
         `)
-        .eq('status', 'active'); // Only consider active employees
+        .eq('role', 'agent')
+        .neq('email', 'ai@autocrm.app');
 
-      if (employeesResponse.error) {
-        console.error("[SmartAssignTicketTool] Error fetching employees:", employeesResponse.error);
-        throw new Error(`Failed to fetch employees: ${employeesResponse.error.message}`);
+      if (employeesError) {
+        throw new Error(`Failed to fetch employees: ${employeesError.message}`);
       }
 
-      if (!employeesResponse.data?.length) {
-        throw new Error('No active employees found');
+      if (!employeesResponse?.length) {
+        throw new Error('No human agents found for assignment');
       }
 
-      const employees = employeesResponse.data as unknown as Employee[];
+      const employees = employeesResponse as unknown as Employee[];
 
       // Determine if input is a specific skill requirement
       const requiredSkill = parsedInput.toLowerCase().trim();
       console.log("[SmartAssignTicketTool] Required skill or context:", requiredSkill);
 
       // Score each employee based on:
-      // 1. Skill match
-      // 2. Current workload
-      // 3. Average resolution time
-      // 4. Role suitability
-      // 5. Recent performance
-      // 6. Customer satisfaction
+      // 1. Skill match (if any)
+      // 2. Role suitability
+      // 3. Status (active preferred)
       console.log("[SmartAssignTicketTool] Scoring employees");
       const scoredEmployees = employees.map(employee => {
+        // Double check to ensure AI agent is never scored
+        if (employee.email === 'ai@autocrm.app') {
+          return {
+            id: employee.id,
+            name: employee.name,
+            email: employee.email,
+            role: employee.role,
+            status: employee.status,
+            skills: [],
+            score: 0,
+            hasRequiredSkill: false,
+            matchReason: ['AI agent cannot be assigned tickets']
+          };
+        }
+
         let score = 100; // Start with base score
+        const matchReason = ['Base score: 100'];
+        
+        // Consider employee status - prefer active but don't exclude others
+        if (employee.status === 'active') {
+          score *= 1.5; // Boost active agents
+          matchReason.push('Active status bonus: score *= 1.5');
+        } else if (employee.status === 'pending') {
+          score *= 0.8; // Slight penalty for pending
+          matchReason.push('Pending status penalty: score *= 0.8');
+        } else if (employee.status === 'inactive') {
+          score *= 0.5; // Larger penalty for inactive
+          matchReason.push('Inactive status penalty: score *= 0.5');
+        }
+
+        // Safely parse skills from JSONB, defaulting to empty object if no skills record exists
+        const skills = employee.employee_skills?.[0]?.skills || {};
+        const employeeSkills = Object.entries(skills).map(([name, level]) => ({
+          skill_name: name,
+          proficiency_level: Number(level)
+        }));
         
         // Check for skill match if a specific skill is required
-        const hasSkill = employee.employee_skills?.some(skill => 
+        const hasSkill = requiredSkill ? employeeSkills.some(skill => 
           skill.skill_name.toLowerCase().includes(requiredSkill) ||
           requiredSkill.includes(skill.skill_name.toLowerCase())
-        );
+        ) : true;
 
-        // If a specific skill is required and employee doesn't have it, significantly reduce score
-        if (requiredSkill && !hasSkill) {
-          score *= 0.1; // Heavily penalize missing required skill
-        } else if (hasSkill) {
-          // Boost score based on skill proficiency
-          const skillMatch = employee.employee_skills?.find(skill => 
-            skill.skill_name.toLowerCase().includes(requiredSkill) ||
-            requiredSkill.includes(skill.skill_name.toLowerCase())
-          );
-          if (skillMatch) {
-            score *= (1 + skillMatch.proficiency_level * 0.5);
+        // Adjust score based on skills
+        if (requiredSkill) {
+          if (!hasSkill) {
+            score *= 0.5; // Reduce score for missing required skill, but don't eliminate
+            matchReason.push(`Missing required skill "${requiredSkill}": score *= 0.5`);
+          } else {
+            const skillMatch = employeeSkills.find(skill => 
+              skill.skill_name.toLowerCase().includes(requiredSkill) ||
+              requiredSkill.includes(skill.skill_name.toLowerCase())
+            );
+            if (skillMatch) {
+              const skillBoost = 1 + skillMatch.proficiency_level * 0.2;
+              score *= skillBoost;
+              matchReason.push(`Has required skill "${requiredSkill}" at level ${skillMatch.proficiency_level}: score *= ${skillBoost.toFixed(2)}`);
+            }
           }
         }
         
-        const metrics = employee.employee_metrics?.[0];
-        if (metrics) {
-          // Reduce score based on current workload
-          const assignedTickets = metrics.assigned_tickets_count || 0;
-          score = score / (1 + assignedTickets * 0.2);
-
-          // Boost score for faster resolution times
-          if (metrics.avg_resolution_time) {
-            score = score * (1 + (1 / metrics.avg_resolution_time));
-          }
-
-          // Consider resolved tickets count (experience)
-          if (metrics.resolved_tickets_count) {
-            score *= (1 + Math.log(metrics.resolved_tickets_count) * 0.1);
-          }
-
-          // Factor in customer satisfaction
-          if (metrics.satisfaction_score) {
-            score *= (1 + (metrics.satisfaction_score - 3) * 0.2); // Assuming 1-5 scale
-          }
+        // Consider employee role
+        if (employee.role === 'agent') {
+          score *= 1.2;
+          matchReason.push('Agent role bonus: score *= 1.2');
         }
 
-        // Consider employee role and status
-        if (employee.role === 'support' || employee.role === 'agent') {
-          score *= 1.2; // Boost score for support roles
-        }
-
-        // Only consider active employees, inactive ones get zero score
-        if (employee.status !== 'active') {
-          score = 0;
-        }
-
-        // Use workload as availability indicator instead of status
-        const currentWorkload = metrics?.assigned_tickets_count || 0;
-        if (currentWorkload > 5) { // High workload
-          score *= 0.5;
-        } else if (currentWorkload > 3) { // Medium workload
-          score *= 0.7;
+        // Consider number of skills as a tiebreaker
+        if (employeeSkills.length > 0) {
+          const skillCountBonus = 1 + (employeeSkills.length * 0.05);
+          score *= skillCountBonus;
+          matchReason.push(`Has ${employeeSkills.length} skills: score *= ${skillCountBonus.toFixed(2)}`);
         }
 
         return {
@@ -191,20 +192,21 @@ export class SmartAssignTicketTool extends Tool {
           email: employee.email,
           role: employee.role,
           status: employee.status,
-          metrics: employee.employee_metrics,
-          skills: employee.employee_skills,
+          skills: employeeSkills,
           score,
-          hasRequiredSkill: hasSkill
+          hasRequiredSkill: hasSkill,
+          matchReason
         };
       });
 
       // Sort by score and get the best match
-      const bestMatch = scoredEmployees
-        .filter(e => requiredSkill ? e.hasRequiredSkill : true) // Only consider employees with required skill if specified
-        .sort((a, b) => b.score - a.score)[0];
+      const sortedEmployees = scoredEmployees
+        .sort((a, b) => b.score - a.score);
 
-      if (!bestMatch) {
-        throw new Error('No suitable employee found for assignment');
+      const bestMatch = sortedEmployees[0];
+
+      if (!bestMatch || bestMatch.score === 0) {
+        throw new Error('No active employees available for assignment');
       }
 
       console.log("[SmartAssignTicketTool] Found best match:", {
@@ -213,7 +215,8 @@ export class SmartAssignTicketTool extends Tool {
         score: bestMatch.score,
         role: bestMatch.role,
         status: bestMatch.status,
-        skills: bestMatch.skills
+        skills: bestMatch.skills,
+        matchReason: bestMatch.matchReason
       });
 
       // Add to ticket history before assignment
@@ -233,7 +236,7 @@ export class SmartAssignTicketTool extends Tool {
             score: bestMatch.score,
             requiredSkill,
             matchedSkills: bestMatch.skills,
-            metrics: bestMatch.metrics?.[0]
+            matchReason: bestMatch.matchReason
           },
           created_at: new Date().toISOString()
         });
